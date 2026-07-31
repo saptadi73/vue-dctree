@@ -42,9 +42,20 @@ const classMetrics = computed(() => {
 })
 
 const aggregatedMetrics = computed(() => {
-  const metrics = workspace.latestRun?.result_json?.classification_report
+  const metrics = workspace.latestMetrics
 
-  if (!metrics) {
+  if (metrics) {
+    return [
+      { label: 'Accuracy', value: Number(metrics.accuracy ?? 0).toFixed(4) },
+      { label: 'Precision', value: Number(metrics.macro_precision ?? metrics.weighted_precision ?? 0).toFixed(4) },
+      { label: 'Recall', value: Number(metrics.macro_recall ?? metrics.weighted_recall ?? 0).toFixed(4) },
+      { label: 'F1-Score', value: Number(metrics.macro_f1 ?? metrics.weighted_f1 ?? 0).toFixed(4) },
+    ]
+  }
+
+  const classification = workspace.latestRun?.result_json?.classification_report
+
+  if (!classification) {
     return [
       { label: 'Accuracy', value: '0.7212' },
       { label: 'Macro F1', value: '0.4777' },
@@ -54,10 +65,10 @@ const aggregatedMetrics = computed(() => {
   }
 
   return [
-    { label: 'Accuracy', value: Number(metrics.accuracy ?? 0).toFixed(4) },
-    { label: 'Macro F1', value: Number(metrics['macro avg']?.['f1-score'] ?? 0).toFixed(4) },
-    { label: 'Weighted F1', value: Number(metrics['weighted avg']?.['f1-score'] ?? 0).toFixed(4) },
-    { label: 'Macro Recall', value: Number(metrics['macro avg']?.recall ?? 0).toFixed(4) },
+    { label: 'Accuracy', value: Number(classification.accuracy ?? 0).toFixed(4) },
+    { label: 'Macro F1', value: Number(classification['macro avg']?.['f1-score'] ?? 0).toFixed(4) },
+    { label: 'Weighted F1', value: Number(classification['weighted avg']?.['f1-score'] ?? 0).toFixed(4) },
+    { label: 'Macro Recall', value: Number(classification['macro avg']?.recall ?? 0).toFixed(4) },
   ]
 })
 
@@ -104,12 +115,20 @@ const liveImportanceSeries = computed(() => {
         <div class="space-y-4">
           <div class="grid grid-cols-[120px_repeat(2,minmax(0,1fr))] gap-3 text-center text-sm">
             <div />
-            <div class="rounded-2xl border border-white/10 bg-white/8 px-3 py-3">Pred Tidak</div>
-            <div class="rounded-2xl border border-white/10 bg-white/8 px-3 py-3">Pred Ya</div>
+            <div
+              class="rounded-2xl border border-white/10 bg-white/8 px-3 py-3"
+            >
+              Pred {{ workspace.latestConfusionMatrix?.labels?.[0] ?? 'Tidak' }}
+            </div>
+            <div
+              class="rounded-2xl border border-white/10 bg-white/8 px-3 py-3"
+            >
+              Pred {{ workspace.latestConfusionMatrix?.labels?.[1] ?? 'Ya' }}
+            </div>
 
             <template v-for="(row, rowIndex) in liveConfusionMatrix" :key="rowIndex">
               <div class="rounded-2xl border border-white/10 bg-white/8 px-3 py-6">
-                {{ rowIndex === 0 ? 'Actual Tidak' : 'Actual Ya' }}
+                {{ rowIndex === 0 ? `Actual ${workspace.latestConfusionMatrix?.labels?.[0] ?? 'Tidak'}` : `Actual ${workspace.latestConfusionMatrix?.labels?.[1] ?? 'Ya'}` }}
               </div>
               <div
                 v-for="cell in row"

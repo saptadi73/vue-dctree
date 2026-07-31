@@ -16,21 +16,39 @@ onMounted(() => {
   }
 })
 
+const edaSummary = computed(() => workspace.edaVisualization?.summary ?? workspace.profileSummary)
+const datasetTableColumns = computed(() => workspace.datasetTable?.columns ?? [])
+const datasetTableRows = computed(() => workspace.datasetTable?.rows ?? [])
+const tableMode = ref<'original' | 'normalized'>('original')
+const activeTable = computed(() =>
+  tableMode.value === 'normalized' ? workspace.normalizedDatasetTable : workspace.datasetTable,
+)
+const activeTableColumns = computed(() => activeTable.value?.columns ?? datasetTableColumns.value)
+const activeTableRows = computed(() => activeTable.value?.rows ?? datasetTableRows.value)
+const activeTablePagination = computed(() => {
+  if (tableMode.value === 'normalized') {
+    return workspace.normalizedDatasetTable?.pagination ?? null
+  }
+
+  return workspace.datasetTable?.pagination ?? null
+})
+const missingColumns = computed(() => workspace.edaVisualization?.charts?.missing_ratio_by_column?.slice(0, 5) ?? [])
+const uniqueColumns = computed(() => workspace.edaVisualization?.charts?.unique_ratio_by_column?.slice(0, 5) ?? [])
+
 const summaryMetrics = computed(() => {
-  const summary = workspace.profileSummary
   const accuracy = workspace.latestMetrics?.accuracy
   const split = workspace.latestRun?.result_json?.dataset_split
 
   return [
     {
       label: 'Rows',
-      value: summary?.rows ? `${summary.rows}` : '--',
+      value: edaSummary.value?.rows ? `${edaSummary.value.rows}` : '--',
       note: 'Jumlah observasi dari dataset aktif',
       tone: 'from-cyan-400/25 to-cyan-500/10',
     },
     {
       label: 'Columns',
-      value: summary?.columns ? `${summary.columns}` : '--',
+      value: edaSummary.value?.columns ? `${edaSummary.value.columns}` : '--',
       note: 'Kolom yang dibaca backend dari workbook',
       tone: 'from-emerald-400/25 to-emerald-500/10',
     },
@@ -52,9 +70,6 @@ const summaryMetrics = computed(() => {
 const topRecommendations = computed(() => {
   return workspace.recommendedConfig?.recommendations?.slice(0, 4) ?? []
 })
-
-const previewColumns = computed(() => workspace.datasetPreview?.columns ?? [])
-const previewRows = computed(() => workspace.datasetPreview?.rows ?? [])
 
 const visibleProcessSteps = computed(() => {
   if (workspace.processWorkflowSteps.length) {
@@ -150,6 +165,26 @@ async function handleTrain() {
   if (!selectedFile.value) return
   await workspace.trainUploadedFile(selectedFile.value)
 }
+
+async function goToPreviousTablePage() {
+  if (!workspace.activeDataset?.id || !activeTablePagination.value?.has_previous) return
+  const prevPage = Number(activeTablePagination.value.page) - 1
+  await workspace.loadDatasetTablePage(
+    workspace.activeDataset.id,
+    prevPage,
+    tableMode.value === 'normalized',
+  )
+}
+
+async function goToNextTablePage() {
+  if (!workspace.activeDataset?.id || !activeTablePagination.value?.has_next) return
+  const nextPage = Number(activeTablePagination.value.page) + 1
+  await workspace.loadDatasetTablePage(
+    workspace.activeDataset.id,
+    nextPage,
+    tableMode.value === 'normalized',
+  )
+}
 </script>
 
 <template>
@@ -166,11 +201,11 @@ async function handleTrain() {
         </div>
 
         <h2 class="mt-6 max-w-3xl font-heading text-4xl font-semibold leading-tight tracking-tight text-white lg:text-5xl">
-          Workspace decision tree yang sekarang membaca dataset, profiling, rekomendasi, dan run langsung dari backend.
+          Frontend sekarang mengikuti kontrak dataset-level dan run-level yang terbaru.
         </h2>
 
         <p class="mt-5 max-w-3xl text-base leading-8 text-slate-300 lg:text-lg">
-          Fokus tampilan ini saya rapikan menjadi dashboard operasional: blok upload, koneksi server, metrik dataset, preview nyata, dan action train. Jadi halaman tidak terasa penuh placeholder lagi.
+          Halaman ini memakai `eda-visualization`, `table`, `target-conversion-preview`, dan workflow run untuk memisahkan tahap persiapan dataset dari hasil analisis model.
         </p>
 
         <div class="mt-7 flex flex-wrap gap-3">
@@ -188,35 +223,6 @@ async function handleTrain() {
           </div>
         </div>
       </div>
-
-      <SectionCard
-        eyebrow="Backend Health"
-        title="Status live, ready, dan db"
-        description="Panel ini membaca ketiga endpoint health backend agar kita bisa membedakan API aktif, readiness, dan koneksi database."
-      >
-        <div class="space-y-3">
-          <article
-            v-for="health in healthCards"
-            :key="health.key"
-            class="flex items-start justify-between gap-4 rounded-[1.5rem] border border-white/10 bg-black/20 p-4"
-          >
-            <div>
-              <p class="font-medium text-white">{{ health.label }}</p>
-              <p class="mt-1 text-sm text-slate-300">{{ health.description }}</p>
-            </div>
-            <span
-              class="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
-              :class="
-                health.status
-                  ? 'border border-emerald-300/20 bg-emerald-300/12 text-emerald-100'
-                  : 'border border-rose-300/20 bg-rose-300/12 text-rose-100'
-              "
-            >
-              {{ health.status ? 'OK' : 'DOWN' }}
-            </span>
-          </article>
-        </div>
-      </SectionCard>
 
       <SectionCard
         eyebrow="Upload & Train"
@@ -282,10 +288,132 @@ async function handleTrain() {
       />
     </section>
 
+    <section class="grid gap-6 xl:grid-cols-[1fr_1fr]">
+      <SectionCard
+        eyebrow="EDA Visualization"
+        title="Ringkasan kualitas data dari endpoint baru"
+        description="Bagian ini membaca `GET /datasets/{dataset_id}/eda-visualization` sesuai dokumentasi workflow yang baru."
+      >
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+            <p class="text-sm text-slate-400">Rows</p>
+            <p class="mt-2 font-heading text-3xl text-white">{{ edaSummary?.rows ?? '--' }}</p>
+          </div>
+          <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+            <p class="text-sm text-slate-400">Columns</p>
+            <p class="mt-2 font-heading text-3xl text-white">{{ edaSummary?.columns ?? '--' }}</p>
+          </div>
+          <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+            <p class="text-sm text-slate-400">Missing Cells</p>
+            <p class="mt-2 font-heading text-3xl text-white">{{ edaSummary?.missing_cells ?? '--' }}</p>
+          </div>
+          <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+            <p class="text-sm text-slate-400">Duplicate Rows</p>
+            <p class="mt-2 font-heading text-3xl text-white">{{ edaSummary?.duplicate_rows ?? '--' }}</p>
+          </div>
+        </div>
+
+        <div class="mt-4 grid gap-4 lg:grid-cols-2">
+          <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+            <p class="text-xs uppercase tracking-[0.24em] text-cyan-200/70">Missing Ratio</p>
+            <div class="mt-4 space-y-3">
+              <div v-for="item in missingColumns" :key="item.column">
+                <div class="mb-1 flex items-center justify-between text-sm text-slate-300">
+                  <span>{{ item.column }}</span>
+                  <span>{{ (item.missing_ratio * 100).toFixed(1) }}%</span>
+                </div>
+                <div class="h-2 rounded-full bg-white/8">
+                  <div class="h-2 rounded-full bg-gradient-to-r from-rose-300 to-orange-300" :style="{ width: `${item.missing_ratio * 100}%` }" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+            <p class="text-xs uppercase tracking-[0.24em] text-cyan-200/70">Unique Ratio</p>
+            <div class="mt-4 space-y-3">
+              <div v-for="item in uniqueColumns" :key="item.column">
+                <div class="mb-1 flex items-center justify-between text-sm text-slate-300">
+                  <span>{{ item.column }}</span>
+                  <span>{{ (item.unique_ratio * 100).toFixed(1) }}%</span>
+                </div>
+                <div class="h-2 rounded-full bg-white/8">
+                  <div class="h-2 rounded-full bg-gradient-to-r from-cyan-300 to-emerald-300" :style="{ width: `${Math.min(item.unique_ratio * 100, 100)}%` }" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        eyebrow="Dataset Table"
+      title="Tabel dataset dari endpoint paginated"
+      description="Preview ini sekarang mengikuti kontrak `GET /datasets/{dataset_id}/table` yang baru."
+      >
+        <div class="mb-4 flex items-center justify-between text-sm text-slate-300">
+          <div class="flex items-center gap-2">
+            <button
+              class="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
+              :class="tableMode === 'original' ? 'bg-cyan-300 text-slate-950' : 'border border-white/10 bg-white/8 text-slate-200'"
+              @click="tableMode = 'original'"
+            >
+              Original
+            </button>
+            <button
+              class="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
+              :class="tableMode === 'normalized' ? 'bg-cyan-300 text-slate-950' : 'border border-white/10 bg-white/8 text-slate-200'"
+              @click="tableMode = 'normalized'"
+            >
+              Normalized
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              class="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
+              :disabled="!activeTablePagination?.has_previous"
+              @click="goToPreviousTablePage"
+            >
+              Sebelumnya
+            </button>
+            <button
+              class="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
+              :disabled="!activeTablePagination?.has_next"
+              @click="goToNextTablePage"
+            >
+              Berikutnya
+            </button>
+          </div>
+          <span>
+            Page {{ activeTable?.pagination?.page ?? 1 }} / {{ activeTable?.pagination?.total_pages ?? 1 }}
+          </span>
+        </div>
+
+        <div class="overflow-x-auto rounded-[1.5rem] border border-white/10">
+          <table class="min-w-full divide-y divide-white/10 text-left text-sm">
+            <thead class="bg-white/8 text-slate-300">
+              <tr>
+                <th v-for="column in activeTableColumns" :key="column" class="px-4 py-3 font-medium">
+                  {{ column }}
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/10 bg-black/20 text-slate-100">
+              <tr v-for="(row, rowIndex) in activeTableRows" :key="rowIndex">
+                <td v-for="column in activeTableColumns" :key="`${rowIndex}-${column}`" class="px-4 py-3">
+                  {{ row[column] }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
+    </section>
+
     <SectionCard
       eyebrow="Main Process"
       title="Tahapan proses yang tampil di frontend"
-      description="Bagian ini merangkum alur yang Anda minta agar pengguna bisa melihat setiap proses utama dari EDA sampai visualisasi pohon keputusan."
+      description="Bagian ini membaca workflow visual run-level dan menautkan user ke halaman yang sesuai."
     >
       <div class="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         <RouterLink
@@ -319,45 +447,31 @@ async function handleTrain() {
 
     <section class="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
       <SectionCard
-        eyebrow="Dataset Snapshot"
-        title="Ringkasan nyata dari profiling backend"
-        description="Informasi ini berasal dari endpoint upload, profile, preview, dan recommend-config pada backend FastAPI lokal."
+        eyebrow="Backend Health"
+        title="Status live, ready, dan db"
+        description="Panel ini membaca ketiga endpoint health backend agar kita bisa membedakan API aktif, readiness, dan koneksi database."
       >
-        <div class="grid gap-4 lg:grid-cols-2">
-          <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-            <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Dataset</p>
-            <p class="mt-2 font-heading text-2xl text-white">{{ workspace.activeDataset?.original_filename ?? '--' }}</p>
-            <p class="mt-3 text-sm text-slate-300">Status: {{ workspace.activeDataset?.status ?? '--' }}</p>
-            <p class="mt-1 text-sm text-slate-300">SHA-256: {{ workspace.activeDataset?.sha256?.slice(0, 18) ?? '--' }}...</p>
-          </div>
-          <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-            <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Summary</p>
-            <p class="mt-2 text-sm text-slate-300">Rows: {{ workspace.profileSummary?.rows ?? '--' }}</p>
-            <p class="mt-1 text-sm text-slate-300">Columns: {{ workspace.profileSummary?.columns ?? '--' }}</p>
-            <p class="mt-1 text-sm text-slate-300">Missing cells: {{ workspace.profileSummary?.missing_cells ?? '--' }}</p>
-            <p class="mt-1 text-sm text-slate-300">Duplicate rows: {{ workspace.profileSummary?.duplicate_rows ?? '--' }}</p>
-          </div>
-        </div>
-
-        <div class="mt-4 overflow-hidden rounded-[1.5rem] border border-white/10">
-          <table class="min-w-full divide-y divide-white/10 text-left text-sm">
-            <thead class="bg-white/8 text-slate-300">
-              <tr>
-                <th class="px-4 py-3 font-medium">Column</th>
-                <th class="px-4 py-3 font-medium">Type</th>
-                <th class="px-4 py-3 font-medium">Unique</th>
-                <th class="px-4 py-3 font-medium">Missing</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-white/10 bg-black/20 text-slate-100">
-              <tr v-for="column in workspace.profileColumns.slice(0, 6)" :key="column.name">
-                <td class="px-4 py-3">{{ column.name }}</td>
-                <td class="px-4 py-3">{{ column.inferred_type }}</td>
-                <td class="px-4 py-3">{{ column.unique_count }}</td>
-                <td class="px-4 py-3">{{ column.missing_count }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="space-y-3">
+          <article
+            v-for="health in healthCards"
+            :key="health.key"
+            class="flex items-start justify-between gap-4 rounded-[1.5rem] border border-white/10 bg-black/20 p-4"
+          >
+            <div>
+              <p class="font-medium text-white">{{ health.label }}</p>
+              <p class="mt-1 text-sm text-slate-300">{{ health.description }}</p>
+            </div>
+            <span
+              class="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
+              :class="
+                health.status
+                  ? 'border border-emerald-300/20 bg-emerald-300/12 text-emerald-100'
+                  : 'border border-rose-300/20 bg-rose-300/12 text-rose-100'
+              "
+            >
+              {{ health.status ? 'OK' : 'DOWN' }}
+            </span>
+          </article>
         </div>
       </SectionCard>
 
@@ -384,45 +498,6 @@ async function handleTrain() {
             <p class="mt-3 text-sm text-slate-300">{{ recommendation.reasons?.join(', ') }}</p>
           </article>
         </div>
-      </SectionCard>
-    </section>
-
-    <section class="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-      <SectionCard
-        eyebrow="Preview"
-        title="Cuplikan data dari endpoint preview"
-        description="Tabel ini membaca langsung output `/preview?limit=5`, jadi strukturnya mengikuti dataset nyata yang sedang aktif."
-      >
-        <div class="overflow-x-auto rounded-[1.5rem] border border-white/10">
-          <table class="min-w-full divide-y divide-white/10 text-left text-sm">
-            <thead class="bg-white/8 text-slate-300">
-              <tr>
-                <th v-for="column in previewColumns" :key="column" class="px-4 py-3 font-medium">
-                  {{ column }}
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-white/10 bg-black/20 text-slate-100">
-              <tr v-for="(row, rowIndex) in previewRows" :key="rowIndex">
-                <td v-for="column in previewColumns" :key="`${rowIndex}-${column}`" class="px-4 py-3">
-                  {{ row[column] }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        eyebrow="Config Editor"
-        title="JSON siap kirim ke upload-train"
-        description="Editor ini menjadi payload `config_json` saat Anda menjalankan training dari frontend."
-      >
-        <textarea
-          v-model="workspace.configEditorText"
-          rows="18"
-          class="w-full rounded-[1.5rem] border border-white/10 bg-[#08101e] p-4 font-mono text-sm leading-6 text-cyan-100 outline-none"
-        />
       </SectionCard>
     </section>
   </div>

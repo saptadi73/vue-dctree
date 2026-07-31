@@ -61,19 +61,30 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const datasets = ref<any[]>([])
   const activeDataset = ref<any | null>(null)
   const datasetPreview = ref<any | null>(null)
+  const datasetTable = ref<any | null>(null)
+  const normalizedDatasetTable = ref<any | null>(null)
+  const edaVisualization = ref<any | null>(null)
+  const targetConversionPreview = ref<any | null>(null)
   const recommendedConfig = ref<any | null>(null)
   const runs = ref<any[]>([])
   const latestRun = ref<any | null>(null)
+  const latestMetrics = ref<any | null>(null)
+  const latestConfusionMatrixData = ref<any | null>(null)
+  const datasetTablePage = ref(1)
+  const datasetTablePageSize = ref(8)
   const workflowVisualization = ref<any | null>(null)
+  const preprocessingSummary = ref<any | null>(null)
   const configEditorText = ref(sampleConfigJson)
 
   const profileSummary = computed(() => activeDataset.value?.profile_json?.summary ?? null)
   const profileColumns = computed(() => activeDataset.value?.profile_json?.columns ?? [])
-  const latestMetrics = computed(() => latestRun.value?.result_json?.metrics ?? null)
-  const latestConfusionMatrix = computed(() => latestRun.value?.result_json?.confusion_matrix ?? null)
+  const latestMetricsComputed = computed(() => latestMetrics.value ?? latestRun.value?.result_json?.metrics ?? null)
+  const latestConfusionMatrix = computed(() => latestConfusionMatrixData.value ?? latestRun.value?.result_json?.confusion_matrix ?? null)
   const latestTree = computed(() => latestRun.value?.result_json?.tree_visualization ?? null)
   const latestImportance = computed(() => latestRun.value?.result_json?.feature_importance ?? [])
   const processWorkflowSteps = computed(() => workflowVisualization.value?.steps ?? [])
+  const datasetTablePagination = computed(() => datasetTable.value?.pagination ?? null)
+  const normalizedDatasetTablePagination = computed(() => normalizedDatasetTable.value?.pagination ?? null)
 
   async function bootstrap() {
     isBootstrapping.value = true
@@ -99,12 +110,12 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       runs.value = await decisionTreeApi.listRuns()
       latestRun.value = runs.value[0] ?? null
 
-      if (latestRun.value?.id) {
-        workflowVisualization.value = await decisionTreeApi.getWorkflowVisualization(latestRun.value.id)
+      if (activeDataset.value?.id) {
+        await hydrateDataset(activeDataset.value.id)
       }
 
-      if (activeDataset.value) {
-        await hydrateDataset(activeDataset.value.id)
+      if (latestRun.value?.id) {
+        await hydrateRun(latestRun.value.id)
       }
     } catch (error) {
       healthOk.value = false
@@ -120,11 +131,57 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   async function hydrateDataset(datasetId: string) {
-    const profile = await decisionTreeApi.profileDataset(datasetId)
+    const [profile, preview, originalTable, normalizedTable, eda, targetPreview, recommendation] =
+      await Promise.all([
+        decisionTreeApi.profileDataset(datasetId),
+        decisionTreeApi.previewDataset(datasetId),
+        decisionTreeApi.getDatasetTable(datasetId, { page: 1, pageSize: datasetTablePageSize.value }),
+        decisionTreeApi.getDatasetTable(datasetId, { page: 1, pageSize: datasetTablePageSize.value, normalized: true }),
+        decisionTreeApi.getEdaVisualization(datasetId),
+        decisionTreeApi.getTargetConversionPreview(datasetId),
+        decisionTreeApi.recommendConfig(datasetId),
+      ])
+
     activeDataset.value = profile
-    datasetPreview.value = await decisionTreeApi.previewDataset(datasetId)
-    recommendedConfig.value = await decisionTreeApi.recommendConfig(datasetId)
-    configEditorText.value = JSON.stringify(recommendedConfig.value, null, 2)
+    datasetPreview.value = preview
+    datasetTable.value = originalTable
+    normalizedDatasetTable.value = normalizedTable
+    edaVisualization.value = eda
+    targetConversionPreview.value = targetPreview
+    recommendedConfig.value = recommendation
+    configEditorText.value = JSON.stringify(recommendation, null, 2)
+    datasetTablePage.value = 1
+  }
+
+  async function loadDatasetTablePage(datasetId: string, page: number, normalized = false) {
+    const nextPage = Math.max(1, page)
+    const table = await decisionTreeApi.getDatasetTable(datasetId, {
+      page: nextPage,
+      pageSize: datasetTablePageSize.value,
+      normalized,
+    })
+
+    if (normalized) {
+      normalizedDatasetTable.value = table
+      return
+    }
+
+    datasetTable.value = table
+    datasetTablePage.value = nextPage
+  }
+
+  async function hydrateRun(runId: string) {
+    const [workflow, preprocessing, metrics, confusion] = await Promise.all([
+      decisionTreeApi.getWorkflowVisualization(runId),
+      decisionTreeApi.getPreprocessingSummary(runId),
+      decisionTreeApi.getRunMetrics(runId),
+      decisionTreeApi.getRunConfusionMatrix(runId),
+    ])
+
+    workflowVisualization.value = workflow
+    preprocessingSummary.value = preprocessing
+    latestMetrics.value = metrics
+    latestConfusionMatrixData.value = confusion
   }
 
   async function uploadFile(file: File) {
@@ -155,7 +212,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       })
       latestRun.value = run
       runs.value = [run, ...runs.value.filter((item) => item.id !== run.id)]
-      workflowVisualization.value = await decisionTreeApi.getWorkflowVisualization(run.id)
+      await hydrateRun(run.id)
     } catch (error) {
       errorMessage.value = error instanceof Error ? error.message : 'Training failed'
     } finally {
@@ -174,18 +231,31 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     datasets,
     activeDataset,
     datasetPreview,
+    datasetTable,
+    normalizedDatasetTable,
+    datasetTablePage,
+    datasetTablePageSize,
+    datasetTablePagination,
+    normalizedDatasetTablePagination,
+    loadDatasetTablePage,
+    edaVisualization,
+    targetConversionPreview,
     recommendedConfig,
     runs,
     latestRun,
+    workflowVisualization,
+    preprocessingSummary,
     profileSummary,
     profileColumns,
-    latestMetrics,
+    latestMetrics: latestMetricsComputed,
     latestConfusionMatrix,
     latestTree,
     latestImportance,
     processWorkflowSteps,
     configEditorText,
     bootstrap,
+    hydrateDataset,
+    hydrateRun,
     uploadFile,
     trainUploadedFile,
   }

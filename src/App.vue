@@ -17,6 +17,7 @@ const navigationGroups = [
     items: [
       { name: 'Overview', path: '/', icon: Radar },
       { name: 'Pipeline', path: '/pipeline', icon: GitBranchPlus },
+      { name: 'EDA', path: '/eda', icon: Radar },
       { name: 'Config', path: '/config-studio', icon: FileJson },
     ],
   },
@@ -24,6 +25,7 @@ const navigationGroups = [
     items: [
       { name: 'Tree', path: '/tree-explorer', icon: BrainCircuit },
       { name: 'Evaluation', path: '/evaluation-lab', icon: ChartColumn },
+      { name: 'Workflow', path: '/workflow-detail', icon: GitBranchPlus },
       { name: 'API', path: '/api-atlas', icon: Blocks },
     ],
   },
@@ -40,9 +42,11 @@ const activeItem = computed(() => {
 const pageDescriptions: Record<string, string> = {
   '/': 'Ringkasan dataset, health backend, upload, dan eksperimen terbaru.',
   '/pipeline': 'Peta workflow dataset, konfigurasi, training, dan artifact generation.',
+  '/eda': 'Ringkasan EDA, missing ratio, unique ratio, dan distribusi data dari endpoint dataset-level.',
   '/config-studio': 'Editor konfigurasi JSON dan validasi yang mengikuti kontrak backend.',
   '/tree-explorer': 'Eksplorasi node decision tree dan rules hasil training.',
   '/evaluation-lab': 'Metrik, confusion matrix, dan feature importance dari backend.',
+  '/workflow-detail': 'Timeline detail 7 langkah analisis dari workflow visualization backend.',
   '/api-atlas': 'Ringkasan endpoint dan modul backend yang dipakai frontend.',
 }
 </script>

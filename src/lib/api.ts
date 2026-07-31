@@ -39,10 +39,25 @@ export const decisionTreeApi = {
       method: 'POST',
     })
   },
+  getEdaVisualization(datasetId: string) {
+    return request<any>(`/api/v1/datasets/${datasetId}/eda-visualization`)
+  },
+  getTargetConversionPreview(datasetId: string) {
+    return request<any>(`/api/v1/datasets/${datasetId}/target-conversion-preview`)
+  },
   recommendConfig(datasetId: string) {
     return request<any>(`/api/v1/datasets/${datasetId}/recommend-config`, {
       method: 'POST',
     })
+  },
+  getDatasetTable(datasetId: string, options?: { page?: number; pageSize?: number; normalized?: boolean }) {
+    const page = options?.page ?? 1
+    const pageSize = options?.pageSize ?? 5
+    const normalized = options?.normalized ? '&normalized=true' : ''
+
+    return request<any>(
+      `/api/v1/datasets/${datasetId}/table?page=${page}&page_size=${pageSize}${normalized}`,
+    )
   },
   previewDataset(datasetId: string, limit = 5) {
     return request<any>(`/api/v1/datasets/${datasetId}/preview?limit=${limit}`)
@@ -50,8 +65,17 @@ export const decisionTreeApi = {
   listRuns() {
     return request<any[]>('/api/v1/experiments/runs')
   },
+  getRunMetrics(runId: string) {
+    return request<any>(`/api/v1/experiments/runs/${runId}/metrics`)
+  },
+  getRunConfusionMatrix(runId: string) {
+    return request<any>(`/api/v1/experiments/runs/${runId}/confusion-matrix`)
+  },
   getWorkflowVisualization(runId: string) {
     return request<any>(`/api/v1/experiments/runs/${runId}/workflow-visualization`)
+  },
+  getPreprocessingSummary(runId: string) {
+    return request<any>(`/api/v1/experiments/runs/${runId}/preprocessing-summary`)
   },
   uploadDataset(file: File) {
     const formData = new FormData()

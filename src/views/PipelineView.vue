@@ -94,22 +94,28 @@ function getProcessStatusClasses(status: string) {
       </div>
     </SectionCard>
 
-    <SectionCard
-      eyebrow="Workflow"
-      title="End-to-end pipeline yang mengikuti spesifikasi backend"
-      description="Urutan ini menegaskan kapan data dipisah, kapan preprocessing di-fit, dan kapan artifact atau event stream mulai muncul."
-    >
-      <div class="grid gap-4 lg:grid-cols-5">
-        <article
-          v-for="stage in pipelineStages"
-          :key="stage.code"
-          class="relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-black/20 p-5"
-        >
+      <SectionCard
+        eyebrow="Workflow"
+        title="End-to-end pipeline yang mengikuti spesifikasi backend"
+        description="Urutan ini menegaskan kapan data dipisah, kapan preprocessing di-fit, dan kapan artifact atau event stream mulai muncul."
+      >
+        <div class="grid gap-4 lg:grid-cols-5">
+          <article
+            v-for="stage in pipelineStages"
+            :key="stage.code"
+            class="relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-black/20 p-5"
+          >
           <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-emerald-300 to-orange-300" />
           <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">{{ stage.code }}</p>
           <h3 class="mt-3 font-heading text-2xl font-semibold">{{ stage.title }}</h3>
           <p class="mt-3 text-sm leading-6 text-slate-300">{{ stage.summary }}</p>
-          <p class="mt-5 text-sm font-semibold text-cyan-100">{{ stage.status }} · {{ stage.progress }}%</p>
+          <p class="mt-5 text-sm font-semibold text-cyan-100">{{ stage.status }} | {{ stage.progress }}%</p>
+          <div class="mt-3 h-1.5 w-full rounded-full bg-white/10">
+            <div
+              class="h-1.5 rounded-full bg-gradient-to-r from-cyan-300 to-emerald-300"
+              :style="{ width: `${stage.progress}%` }"
+            />
+          </div>
         </article>
       </div>
     </SectionCard>
