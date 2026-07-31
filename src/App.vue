@@ -91,25 +91,27 @@ const pageDescriptions: Record<string, string> = {
         </div>
       </aside>
 
-      <main class="flex-1 px-5 py-6 lg:px-8 lg:py-8">
-        <header class="mb-6 rounded-[2rem] border border-white/10 bg-white/7 p-6 backdrop-blur-xl">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <main class="mx-auto w-full max-w-[1460px] px-5 py-5 lg:px-7 lg:py-7">
+        <header class="mb-6 rounded-[2rem] border border-white/10 bg-white/7 p-4 backdrop-blur-xl sm:p-5">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between lg:gap-6">
             <div>
               <p class="text-sm font-semibold uppercase tracking-[0.35em] text-cyan-200/75">Friday, July 31, 2026</p>
-              <h1 class="mt-2 font-heading text-4xl font-semibold tracking-tight">{{ activeItem.name }}</h1>
-              <p class="mt-3 max-w-3xl text-slate-300">
+              <h1 class="mt-2 max-w-[780px] font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
+                {{ activeItem.name }}
+              </h1>
+              <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
                 {{ pageDescriptions[route.path] }} Experience ini memetakan alur upload dataset, konfigurasi JSON, training Decision Tree, evaluasi, dan kontrak API yang ada pada desain FastAPI.
               </p>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 lg:w-[360px]">
+            <div class="grid w-full min-w-0 grid-cols-2 gap-3 md:grid-cols-2 lg:w-[320px]">
               <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
                 <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Run State</p>
-                <p class="mt-2 font-heading text-2xl text-emerald-300">COMPLETED</p>
+                <p class="mt-2 truncate font-heading text-xl text-emerald-300 md:text-2xl">COMPLETED</p>
               </div>
               <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
                 <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Artifacts</p>
-                <p class="mt-2 font-heading text-2xl text-orange-200">11 outputs</p>
+                <p class="mt-2 truncate font-heading text-xl text-orange-200 md:text-2xl">11 outputs</p>
               </div>
             </div>
           </div>

@@ -54,21 +54,23 @@ const targetTotal = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <section class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+  <div class="mx-auto flex w-full max-w-[1180px] flex-col gap-6">
+    <section class="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]">
       <SectionCard
         eyebrow="Config Lens"
         title="JSON sebagai sumber instruksi pipeline"
         description="Halaman ini menonjolkan ide utama dokumen: konfigurasi bukan model. Ia hanyalah instruksi pipeline yang dapat divalidasi, diberi versi, dan diaktifkan."
       >
-        <div class="space-y-4">
+        <div class="grid gap-4 sm:grid-cols-2">
           <article
             v-for="item in configHighlights"
             :key="item.key"
             class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4"
           >
             <p class="text-xs uppercase tracking-[0.24em] text-cyan-200/70">{{ item.key }}</p>
-            <p class="mt-2 font-heading text-2xl font-semibold text-white">{{ item.value }}</p>
+            <p class="mt-2 line-clamp-2 min-h-[4rem] font-heading text-xl font-semibold leading-tight text-white">
+              {{ item.value }}
+            </p>
             <p class="mt-2 text-sm leading-6 text-slate-300">{{ item.description }}</p>
           </article>
         </div>
@@ -79,56 +81,84 @@ const targetTotal = computed(() => {
         title="Preview konversi target atau CGPA ke kategori"
         description="Bagian ini mengikuti endpoint `GET /datasets/{dataset_id}/target-conversion-preview` dari dokumentasi baru."
       >
-        <div class="space-y-3">
-          <article
-            v-for="item in targetDistribution"
-            :key="item.label"
-            class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4"
-          >
-            <div class="mb-2 flex items-center justify-between text-sm text-slate-300">
-              <span>{{ item.label }}</span>
-              <span>{{ item.count }}</span>
+        <div class="space-y-4">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+              <p class="text-sm text-slate-400">Target Column</p>
+              <p class="mt-2 font-heading text-2xl text-white">
+                {{ workspace.targetConversionPreview?.target_column ?? '--' }}
+              </p>
             </div>
-            <div class="h-2 rounded-full bg-white/8">
-              <div
-                class="h-2 rounded-full bg-gradient-to-r from-cyan-300 to-emerald-300"
-                :style="{ width: `${Math.min((item.count / (targetTotal || 1)) * 100, 100)}%` }"
-              />
+            <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+              <p class="text-sm text-slate-400">Positive Class</p>
+              <p class="mt-2 font-heading text-2xl text-white">
+                {{ workspace.targetConversionPreview?.positive_class ?? '--' }}
+              </p>
             </div>
-          </article>
+          </div>
+
+          <div class="grid gap-3">
+            <article
+              v-for="item in targetDistribution"
+              :key="item.label"
+              class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4"
+            >
+              <div class="mb-2 flex items-center justify-between text-sm text-slate-300">
+                <span>{{ item.label }}</span>
+                <span>{{ item.count }}</span>
+              </div>
+              <div class="h-2 rounded-full bg-white/8">
+                <div
+                  class="h-2 rounded-full bg-gradient-to-r from-cyan-300 to-emerald-300"
+                  :style="{ width: `${Math.min((item.count / (targetTotal || 1)) * 100, 100)}%` }"
+                />
+              </div>
+            </article>
+          </div>
         </div>
       </SectionCard>
     </section>
 
-    <section class="grid gap-6 xl:grid-cols-[1fr_1fr]">
+    <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
       <SectionCard
         eyebrow="Canonical JSON"
         title="Draft konfigurasi yang bisa divalidasi"
         description="Editor ini sekarang mengikuti payload config yang dipakai frontend untuk `upload-train`."
       >
-        <pre class="overflow-x-auto rounded-[1.5rem] border border-white/10 bg-[#08101e] p-5 text-sm leading-7 text-cyan-100"><code>{{ configJson }}</code></pre>
+        <div class="rounded-[1.7rem] border border-white/10 bg-[#08101e] p-3">
+          <pre class="max-h-[620px] overflow-auto rounded-[1.25rem] bg-[#06101d] p-5 text-sm leading-7 text-cyan-100"><code>{{ configJson }}</code></pre>
+        </div>
       </SectionCard>
 
       <SectionCard
         eyebrow="Preprocessing Summary"
         title="Ringkasan preprocessing per run"
-        description="Data ini berasal dari endpoint `GET /experiments/runs/{run_id}/preprocessing-summary`."
+        description="Data ini berasal dari endpoint preprocessing summary milik run aktif."
       >
-        <div class="grid gap-4 sm:grid-cols-2">
-          <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+        <div class="grid gap-4 grid-cols-1">
+          <div class="min-w-0 rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
             <p class="text-sm text-slate-400">Before Encoding</p>
             <p class="mt-2 font-heading text-3xl text-white">{{ preprocessingSummary?.feature_count_before_encoding ?? '--' }}</p>
           </div>
-          <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+          <div class="min-w-0 rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
             <p class="text-sm text-slate-400">After Encoding</p>
             <p class="mt-2 font-heading text-3xl text-white">{{ preprocessingSummary?.feature_count_after_encoding ?? '--' }}</p>
           </div>
         </div>
 
-        <div class="mt-4 rounded-[1.5rem] border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
-          <p>Numeric: {{ preprocessingSummary?.numeric_features?.join(', ') || '--' }}</p>
-          <p class="mt-2">Categorical: {{ preprocessingSummary?.categorical_features?.join(', ') || '--' }}</p>
-          <p class="mt-2">Ordinal: {{ preprocessingSummary?.ordinal_features?.join(', ') || '--' }}</p>
+        <div class="mt-4 space-y-3">
+          <div class="min-w-0 rounded-[1.5rem] border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
+            <p class="text-xs uppercase tracking-[0.24em] text-cyan-200/70">Numeric</p>
+            <p class="mt-2 break-words leading-6">{{ preprocessingSummary?.numeric_features?.join(', ') || '--' }}</p>
+          </div>
+          <div class="min-w-0 rounded-[1.5rem] border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
+            <p class="text-xs uppercase tracking-[0.24em] text-cyan-200/70">Categorical</p>
+            <p class="mt-2 break-words leading-6">{{ preprocessingSummary?.categorical_features?.join(', ') || '--' }}</p>
+          </div>
+          <div class="min-w-0 rounded-[1.5rem] border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
+            <p class="text-xs uppercase tracking-[0.24em] text-cyan-200/70">Ordinal</p>
+            <p class="mt-2 break-words leading-6">{{ preprocessingSummary?.ordinal_features?.join(', ') || '--' }}</p>
+          </div>
         </div>
       </SectionCard>
     </section>
