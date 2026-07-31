@@ -1,31 +1,43 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import DashboardView from '../views/DashboardView.vue'
-import ReportsView from '../views/ReportsView.vue'
-import SettingsView from '../views/SettingsView.vue'
-import StructureView from '../views/StructureView.vue'
+import ApiAtlasView from '../views/ApiAtlasView.vue'
+import ConfigStudioView from '../views/ConfigStudioView.vue'
+import EvaluationLabView from '../views/EvaluationLabView.vue'
+import OverviewView from '../views/OverviewView.vue'
+import PipelineView from '../views/PipelineView.vue'
+import TreeExplorerView from '../views/TreeExplorerView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      name: 'dashboard',
-      component: DashboardView,
+      name: 'overview',
+      component: OverviewView,
     },
     {
-      path: '/structure',
-      name: 'structure',
-      component: StructureView,
+      path: '/pipeline',
+      name: 'pipeline',
+      component: PipelineView,
     },
     {
-      path: '/reports',
-      name: 'reports',
-      component: ReportsView,
+      path: '/config-studio',
+      name: 'config-studio',
+      component: ConfigStudioView,
     },
     {
-      path: '/settings',
-      name: 'settings',
-      component: SettingsView,
+      path: '/tree-explorer',
+      name: 'tree-explorer',
+      component: TreeExplorerView,
+    },
+    {
+      path: '/evaluation-lab',
+      name: 'evaluation-lab',
+      component: EvaluationLabView,
+    },
+    {
+      path: '/api-atlas',
+      name: 'api-atlas',
+      component: ApiAtlasView,
     },
   ],
 })

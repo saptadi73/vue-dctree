@@ -10,6 +10,20 @@
   --font-heading: 'Montserrat', sans-serif;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: var(--font-sans);
+  background: #0b1020;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(42, 157, 143, 0.35);
+  color: white;
 }
