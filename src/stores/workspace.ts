@@ -82,7 +82,12 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const latestClassMetrics = computed(() => latestMetrics.value?.class_metrics ?? latestRun.value?.result_json?.class_metrics ?? [])
   const latestConfusionMatrix = computed(() => latestConfusionMatrixData.value ?? latestRun.value?.result_json?.confusion_matrix ?? null)
   const latestTree = computed(() => latestRun.value?.result_json?.tree_visualization ?? null)
-  const latestImportance = computed(() => latestRun.value?.result_json?.feature_importance ?? [])
+  const latestImportance = computed(() =>
+    latestRun.value?.result_json?.original_feature_importance ??
+    latestRun.value?.result_json?.feature_importance ??
+    latestRun.value?.result_json?.transformed_feature_importance ??
+    [],
+  )
   const processWorkflowSteps = computed(() => workflowVisualization.value?.steps ?? [])
   const datasetTablePagination = computed(() => datasetTable.value?.pagination ?? null)
   const normalizedDatasetTablePagination = computed(() => normalizedDatasetTable.value?.pagination ?? null)

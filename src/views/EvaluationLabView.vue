@@ -12,6 +12,21 @@ type ConfusionCell = {
   emphasis: string
 }
 
+type ImportanceItem = {
+  feature: string
+  importance: number
+}
+
+const toFiniteNumber = (value: unknown) => {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : null
+}
+
+const formatDecimal = (value: unknown) => {
+  const numericValue = toFiniteNumber(value)
+  return numericValue === null ? '--' : numericValue.toFixed(4)
+}
+
 onMounted(() => {
   if (!workspace.latestRun && !workspace.isBootstrapping) {
     workspace.bootstrap()
@@ -20,11 +35,9 @@ onMounted(() => {
 
 const normalizeMatrixRow = (row: unknown): number[] => {
   if (Array.isArray(row)) {
-    return row.map((value) => Number(value ?? 0))
-  }
-
-  if (row && typeof row === 'object') {
-    return Object.values(row).map((value) => Number(value ?? 0))
+    return row
+      .map((value) => toFiniteNumber(value))
+      .filter((value): value is number => value !== null)
   }
 
   return []
@@ -55,21 +68,25 @@ const liveConfusionMatrix = computed(() => {
   const labels = liveConfusionLabels.value
   const rows = Array.isArray(matrix.values) ? matrix.values : []
 
-  return rows.map((row: unknown, rowIndex: number) =>
-    normalizeMatrixRow(row).map((value: number, columnIndex: number) => ({
-      value,
-      label: `Actual ${labels[rowIndex] ?? rowIndex + 1} / Pred ${labels[columnIndex] ?? columnIndex + 1}`,
-      emphasis: value >= 50 ? 'high' : value >= 10 ? 'alert' : value >= 3 ? 'mid' : 'low',
-    })),
+  const cells = rows.map((row: unknown, rowIndex: number) =>
+    normalizeMatrixRow(row)
+      .slice(0, labels.length)
+      .map((value: number, columnIndex: number) => ({
+        value,
+        label: `Actual ${labels[rowIndex] ?? rowIndex + 1} / Pred ${labels[columnIndex] ?? columnIndex + 1}`,
+        emphasis: value >= 50 ? 'high' : value >= 10 ? 'alert' : value >= 3 ? 'mid' : 'low',
+      })),
   ).filter((row: ConfusionCell[]) => row.length)
+
+  return cells.length ? cells : confusionMatrix
 })
 
 const classMetrics = computed(() => {
   return workspace.latestClassMetrics?.map((metric: any) => ({
     label: metric.class_label,
-    precision: metric.precision?.toFixed(4) ?? '--',
-    recall: metric.recall?.toFixed(4) ?? '--',
-    f1: metric.f1_score?.toFixed(4) ?? '--',
+    precision: formatDecimal(metric.precision),
+    recall: formatDecimal(metric.recall),
+    f1: formatDecimal(metric.f1_score ?? metric.f1),
     support: `${metric.support ?? '--'}`,
   })) ?? [
     { label: 'Tidak', precision: '0.4286', recall: '0.1071', f1: '0.1714', support: '28' },
@@ -82,10 +99,10 @@ const aggregatedMetrics = computed(() => {
 
   if (metrics) {
     return [
-      { label: 'Accuracy', value: typeof metrics.accuracy === 'number' ? metrics.accuracy.toFixed(4) : '--' },
-      { label: 'Precision', value: typeof metrics.precision === 'number' ? metrics.precision.toFixed(4) : '--' },
-      { label: 'Recall', value: typeof metrics.recall === 'number' ? metrics.recall.toFixed(4) : '--' },
-      { label: 'F1-Score', value: typeof (metrics.f1_score ?? metrics.f1) === 'number' ? (metrics.f1_score ?? metrics.f1).toFixed(4) : '--' },
+      { label: 'Accuracy', value: formatDecimal(metrics.accuracy) },
+      { label: 'Precision', value: formatDecimal(metrics.precision) },
+      { label: 'Recall', value: formatDecimal(metrics.recall) },
+      { label: 'F1-Score', value: formatDecimal(metrics.f1_score ?? metrics.f1) },
     ]
   }
 
@@ -109,7 +126,7 @@ const aggregatedMetrics = computed(() => {
 })
 
 const liveImportanceOptions = computed(() => {
-  const features = workspace.latestImportance
+  const features = normalizedImportance.value
 
   if (!features.length) {
     return featureImportanceOptions
@@ -119,13 +136,26 @@ const liveImportanceOptions = computed(() => {
     ...featureImportanceOptions,
     xaxis: {
       ...featureImportanceOptions.xaxis,
-      categories: features.slice(0, 8).map((item: any) => item.feature),
+      categories: features.slice(0, 8).map((item) => item.feature),
     },
   }
 })
 
+const normalizedImportance = computed<ImportanceItem[]>(() => {
+  return workspace.latestImportance
+    .map((item: any) => {
+      const importance = toFiniteNumber(item.importance ?? item.value ?? item.score)
+
+      return {
+        feature: String(item.feature ?? item.feature_name ?? item.original_feature ?? item.name ?? '--'),
+        importance,
+      }
+    })
+    .filter((item: { feature: string; importance: number | null }): item is ImportanceItem => item.importance !== null)
+})
+
 const liveImportanceSeries = computed(() => {
-  const features = workspace.latestImportance
+  const features = normalizedImportance.value
 
   if (!features.length) {
     return featureImportanceSeries
@@ -134,7 +164,7 @@ const liveImportanceSeries = computed(() => {
   return [
     {
       name: 'Importance',
-      data: features.slice(0, 8).map((item: any) => Number(item.importance.toFixed(4))),
+      data: features.slice(0, 8).map((item: ImportanceItem) => Number(item.importance.toFixed(4))),
     },
   ]
 })
