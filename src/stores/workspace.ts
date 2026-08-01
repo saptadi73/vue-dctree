@@ -78,7 +78,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   const profileSummary = computed(() => activeDataset.value?.profile_json?.summary ?? null)
   const profileColumns = computed(() => activeDataset.value?.profile_json?.columns ?? [])
-  const latestMetricsComputed = computed(() => latestMetrics.value ?? latestRun.value?.result_json?.metrics ?? null)
+  const latestMetricsComputed = computed(() => latestMetrics.value?.metrics ?? latestMetrics.value ?? latestRun.value?.result_json?.metrics ?? null)
+  const latestClassMetrics = computed(() => latestMetrics.value?.class_metrics ?? latestRun.value?.result_json?.class_metrics ?? [])
   const latestConfusionMatrix = computed(() => latestConfusionMatrixData.value ?? latestRun.value?.result_json?.confusion_matrix ?? null)
   const latestTree = computed(() => latestRun.value?.result_json?.tree_visualization ?? null)
   const latestImportance = computed(() => latestRun.value?.result_json?.feature_importance ?? [])
@@ -248,6 +249,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     profileSummary,
     profileColumns,
     latestMetrics: latestMetricsComputed,
+    latestClassMetrics,
     latestConfusionMatrix,
     latestTree,
     latestImportance,

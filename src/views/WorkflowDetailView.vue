@@ -86,9 +86,11 @@ function getStepPayload(step: any) {
   }
 
   if (step.code === 'metrics') {
+    const f1Score = workspace.latestMetrics?.f1_score ?? workspace.latestMetrics?.f1
+
     return [
       ['Accuracy', typeof workspace.latestMetrics?.accuracy === 'number' ? `${(workspace.latestMetrics.accuracy * 100).toFixed(2)}%` : '--'],
-      ['Macro F1', typeof workspace.latestMetrics?.macro_f1 === 'number' ? `${(workspace.latestMetrics.macro_f1 * 100).toFixed(2)}%` : '--'],
+      ['F1', typeof f1Score === 'number' ? `${(f1Score * 100).toFixed(2)}%` : '--'],
     ]
   }
 

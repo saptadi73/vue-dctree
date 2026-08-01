@@ -107,11 +107,11 @@ const pageDescriptions: Record<string, string> = {
             <div class="grid w-full min-w-0 grid-cols-2 gap-3 md:grid-cols-2 lg:w-[320px]">
               <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
                 <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Run State</p>
-                <p class="mt-2 truncate font-heading text-xl text-emerald-300 md:text-2xl">COMPLETED</p>
+                <p class="mt-2 truncate font-heading text-lg text-emerald-300 md:text-xl">COMPLETED</p>
               </div>
               <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
                 <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Artifacts</p>
-                <p class="mt-2 truncate font-heading text-xl text-orange-200 md:text-2xl">11 outputs</p>
+                <p class="mt-2 truncate font-heading text-lg text-orange-200 md:text-xl">11 outputs</p>
               </div>
             </div>
           </div>

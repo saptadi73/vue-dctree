@@ -6,11 +6,44 @@ import { useWorkspaceStore } from '../stores/workspace'
 
 const workspace = useWorkspaceStore()
 
+type ConfusionCell = {
+  value: number
+  label: string
+  emphasis: string
+}
+
 onMounted(() => {
   if (!workspace.latestRun && !workspace.isBootstrapping) {
     workspace.bootstrap()
   }
 })
+
+const normalizeMatrixRow = (row: unknown): number[] => {
+  if (Array.isArray(row)) {
+    return row.map((value) => Number(value ?? 0))
+  }
+
+  if (row && typeof row === 'object') {
+    return Object.values(row).map((value) => Number(value ?? 0))
+  }
+
+  return []
+}
+
+const liveConfusionLabels = computed(() => {
+  const labels = workspace.latestConfusionMatrix?.labels
+
+  if (Array.isArray(labels) && labels.length) {
+    return labels.map((label: unknown) => String(label))
+  }
+
+  return ['Tidak', 'Ya']
+})
+
+const confusionLabelAt = (index: number | string) => {
+  const numericIndex = Number(index)
+  return liveConfusionLabels.value[numericIndex] ?? numericIndex + 1
+}
 
 const liveConfusionMatrix = computed(() => {
   const matrix = workspace.latestConfusionMatrix
@@ -19,17 +52,20 @@ const liveConfusionMatrix = computed(() => {
     return confusionMatrix
   }
 
-  return matrix.values.map((row: number[], rowIndex: number) =>
-    row.map((value: number, columnIndex: number) => ({
+  const labels = liveConfusionLabels.value
+  const rows = Array.isArray(matrix.values) ? matrix.values : []
+
+  return rows.map((row: unknown, rowIndex: number) =>
+    normalizeMatrixRow(row).map((value: number, columnIndex: number) => ({
       value,
-      label: `Actual ${matrix.labels[rowIndex]} / Pred ${matrix.labels[columnIndex]}`,
+      label: `Actual ${labels[rowIndex] ?? rowIndex + 1} / Pred ${labels[columnIndex] ?? columnIndex + 1}`,
       emphasis: value >= 50 ? 'high' : value >= 10 ? 'alert' : value >= 3 ? 'mid' : 'low',
     })),
-  )
+  ).filter((row: ConfusionCell[]) => row.length)
 })
 
 const classMetrics = computed(() => {
-  return workspace.latestRun?.result_json?.class_metrics?.map((metric: any) => ({
+  return workspace.latestClassMetrics?.map((metric: any) => ({
     label: metric.class_label,
     precision: metric.precision?.toFixed(4) ?? '--',
     recall: metric.recall?.toFixed(4) ?? '--',
@@ -46,10 +82,10 @@ const aggregatedMetrics = computed(() => {
 
   if (metrics) {
     return [
-      { label: 'Accuracy', value: Number(metrics.accuracy ?? 0).toFixed(4) },
-      { label: 'Precision', value: Number(metrics.macro_precision ?? metrics.weighted_precision ?? 0).toFixed(4) },
-      { label: 'Recall', value: Number(metrics.macro_recall ?? metrics.weighted_recall ?? 0).toFixed(4) },
-      { label: 'F1-Score', value: Number(metrics.macro_f1 ?? metrics.weighted_f1 ?? 0).toFixed(4) },
+      { label: 'Accuracy', value: typeof metrics.accuracy === 'number' ? metrics.accuracy.toFixed(4) : '--' },
+      { label: 'Precision', value: typeof metrics.precision === 'number' ? metrics.precision.toFixed(4) : '--' },
+      { label: 'Recall', value: typeof metrics.recall === 'number' ? metrics.recall.toFixed(4) : '--' },
+      { label: 'F1-Score', value: typeof (metrics.f1_score ?? metrics.f1) === 'number' ? (metrics.f1_score ?? metrics.f1).toFixed(4) : '--' },
     ]
   }
 
@@ -113,22 +149,22 @@ const liveImportanceSeries = computed(() => {
         description="Rows merepresentasikan actual labels dan columns merepresentasikan predicted labels, persis seperti kontrak evaluasi di dokumen."
       >
         <div class="space-y-4">
-          <div class="grid grid-cols-[120px_repeat(2,minmax(0,1fr))] gap-3 text-center text-sm">
+          <div
+            class="grid gap-3 text-center text-sm"
+            :style="{ gridTemplateColumns: `120px repeat(${liveConfusionLabels.length}, minmax(0, 1fr))` }"
+          >
             <div />
             <div
+              v-for="label in liveConfusionLabels"
+              :key="`pred-${label}`"
               class="rounded-2xl border border-white/10 bg-white/8 px-3 py-3"
             >
-              Pred {{ workspace.latestConfusionMatrix?.labels?.[0] ?? 'Tidak' }}
-            </div>
-            <div
-              class="rounded-2xl border border-white/10 bg-white/8 px-3 py-3"
-            >
-              Pred {{ workspace.latestConfusionMatrix?.labels?.[1] ?? 'Ya' }}
+              Pred {{ label }}
             </div>
 
             <template v-for="(row, rowIndex) in liveConfusionMatrix" :key="rowIndex">
               <div class="rounded-2xl border border-white/10 bg-white/8 px-3 py-6">
-                {{ rowIndex === 0 ? `Actual ${workspace.latestConfusionMatrix?.labels?.[0] ?? 'Tidak'}` : `Actual ${workspace.latestConfusionMatrix?.labels?.[1] ?? 'Ya'}` }}
+                Actual {{ confusionLabelAt(rowIndex) }}
               </div>
               <div
                 v-for="cell in row"
