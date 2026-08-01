@@ -70,6 +70,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const latestRun = ref<any | null>(null)
   const latestMetrics = ref<any | null>(null)
   const latestConfusionMatrixData = ref<any | null>(null)
+  const latestFeatureImportanceData = ref<any | null>(null)
   const datasetTablePage = ref(1)
   const datasetTablePageSize = ref(8)
   const workflowVisualization = ref<any | null>(null)
@@ -83,8 +84,11 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const latestConfusionMatrix = computed(() => latestConfusionMatrixData.value ?? latestRun.value?.result_json?.confusion_matrix ?? null)
   const latestTree = computed(() => latestRun.value?.result_json?.tree_visualization ?? null)
   const latestImportance = computed(() =>
+    latestFeatureImportanceData.value?.original_feature_importance ??
     latestRun.value?.result_json?.original_feature_importance ??
+    latestFeatureImportanceData.value?.feature_importance ??
     latestRun.value?.result_json?.feature_importance ??
+    latestFeatureImportanceData.value?.transformed_feature_importance ??
     latestRun.value?.result_json?.transformed_feature_importance ??
     [],
   )
@@ -177,17 +181,19 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   async function hydrateRun(runId: string) {
-    const [workflow, preprocessing, metrics, confusion] = await Promise.all([
+    const [workflow, preprocessing, metrics, confusion, importance] = await Promise.all([
       decisionTreeApi.getWorkflowVisualization(runId),
       decisionTreeApi.getPreprocessingSummary(runId),
       decisionTreeApi.getRunMetrics(runId),
       decisionTreeApi.getRunConfusionMatrix(runId),
+      decisionTreeApi.getRunFeatureImportance(runId),
     ])
 
     workflowVisualization.value = workflow
     preprocessingSummary.value = preprocessing
     latestMetrics.value = metrics
     latestConfusionMatrixData.value = confusion
+    latestFeatureImportanceData.value = importance
   }
 
   async function uploadFile(file: File) {

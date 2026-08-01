@@ -71,6 +71,9 @@ export const decisionTreeApi = {
   getRunConfusionMatrix(runId: string) {
     return request<any>(`/api/v1/experiments/runs/${runId}/confusion-matrix`)
   },
+  getRunFeatureImportance(runId: string) {
+    return request<any>(`/api/v1/experiments/runs/${runId}/feature-importance`)
+  },
   getWorkflowVisualization(runId: string) {
     return request<any>(`/api/v1/experiments/runs/${runId}/workflow-visualization`)
   },

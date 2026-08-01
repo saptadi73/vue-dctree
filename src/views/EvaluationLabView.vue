@@ -137,6 +137,12 @@ const liveImportanceOptions = computed(() => {
     xaxis: {
       ...featureImportanceOptions.xaxis,
       categories: features.slice(0, 8).map((item) => item.feature),
+      min: 0,
+      max: 1,
+      labels: {
+        ...featureImportanceOptions.xaxis.labels,
+        formatter: (value: string) => `${(Number(value) * 100).toFixed(0)}%`,
+      },
     },
   }
 })
@@ -152,6 +158,7 @@ const normalizedImportance = computed<ImportanceItem[]>(() => {
       }
     })
     .filter((item: { feature: string; importance: number | null }): item is ImportanceItem => item.importance !== null)
+    .sort((first: ImportanceItem, second: ImportanceItem) => second.importance - first.importance)
 })
 
 const liveImportanceSeries = computed(() => {
