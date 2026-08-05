@@ -2,48 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { API_BASE_URL, decisionTreeApi } from '../lib/api'
 
-const sampleConfigJson = `{
-  "schema_version": "1.0",
-  "task": {
-    "type": "classification",
-    "target_column": "Apakah Anda merasa prestasi akademik (IPK) Anda baik?",
-    "positive_class": "Ya"
-  },
-  "preprocessing": {
-    "mode": "strict",
-    "collapse_rare_study_programs": true,
-    "simplify_social_media_platforms": true,
-    "normalize_binary_labels": true,
-    "normalize_duration_buckets": true
-  },
-  "columns": [
-    { "name": "Nama :", "data_type": "categorical", "role": "identifier", "enabled": false, "encoding": "one_hot" },
-    { "name": "Jenis Kelamin :", "data_type": "categorical", "role": "feature", "enabled": true, "encoding": "one_hot" },
-    { "name": "Tingkat Semester :", "data_type": "numeric", "role": "feature", "enabled": true },
-    { "name": "Program Studi/Jurusan :", "data_type": "categorical", "role": "feature", "enabled": true, "encoding": "one_hot" },
-    { "name": "Berapa lama Anda menggunakan Media Sosial dalam sehari?", "data_type": "categorical", "role": "feature", "enabled": true, "encoding": "one_hot" },
-    { "name": "Berapa lama Anda tidur dalam sehari?", "data_type": "categorical", "role": "feature", "enabled": true, "encoding": "one_hot" },
-    { "name": "Apakah Anda merasa prestasi akademik (IPK) Anda baik?", "data_type": "categorical", "role": "target", "enabled": true, "encoding": "one_hot" },
-    { "name": "Apakah penggunaan Media Sosial dapat mempengaruhi prestasi akademik Anda?", "data_type": "categorical", "role": "feature", "enabled": true, "encoding": "one_hot" },
-    { "name": "Platform Media Sosial apa yang paling sering Anda gunakan?", "data_type": "categorical", "role": "feature", "enabled": true, "encoding": "one_hot" },
-    { "name": "Apakah penggunaan Media Sosial berpengaruh terhadap jam tidur Anda?", "data_type": "categorical", "role": "feature", "enabled": true, "encoding": "one_hot" }
-  ],
-  "split": {
-    "method": "train_test",
-    "test_size": 0.2,
-    "stratify": true,
-    "random_state": 42
-  },
-  "model": {
-    "algorithm": "decision_tree_classifier",
-    "criterion": "gini",
-    "splitter": "best",
-    "max_depth": 4,
-    "min_samples_split": 2,
-    "min_samples_leaf": 1,
-    "random_state": 42
-  }
-}`
+const emptyConfigJson = '{}'
 
 export const useWorkspaceStore = defineStore('workspace', () => {
   const apiBaseUrl = API_BASE_URL
@@ -66,6 +25,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const edaVisualization = ref<any | null>(null)
   const targetConversionPreview = ref<any | null>(null)
   const recommendedConfig = ref<any | null>(null)
+  const configurationPresets = ref<Array<{ id: string; label: string; description: string }>>([])
+  const selectedPreset = ref<string>('')
   const runs = ref<any[]>([])
   const latestRun = ref<any | null>(null)
   const latestMetrics = ref<any | null>(null)
@@ -75,7 +36,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const datasetTablePageSize = ref(8)
   const workflowVisualization = ref<any | null>(null)
   const preprocessingSummary = ref<any | null>(null)
-  const configEditorText = ref(sampleConfigJson)
+  const configEditorText = ref(emptyConfigJson)
+  const isLoadingPreset = ref(false)
+  const lastUploadedFile = ref<File | null>(null)
 
   const profileSummary = computed(() => activeDataset.value?.profile_json?.summary ?? null)
   const profileColumns = computed(() => activeDataset.value?.profile_json?.columns ?? [])
@@ -95,6 +58,11 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const processWorkflowSteps = computed(() => workflowVisualization.value?.steps ?? [])
   const datasetTablePagination = computed(() => datasetTable.value?.pagination ?? null)
   const normalizedDatasetTablePagination = computed(() => normalizedDatasetTable.value?.pagination ?? null)
+  const hasReadyTrainingContext = computed(() =>
+    Boolean(activeDataset.value && selectedPreset.value && !isLoadingPreset.value && recommendedConfig.value),
+  )
+  const hasCachedUploadedFile = computed(() => lastUploadedFile.value != null)
+  const lastUploadedFileName = computed(() => lastUploadedFile.value?.name ?? '')
 
   async function bootstrap() {
     isBootstrapping.value = true
@@ -115,6 +83,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       healthOk.value = Object.values(healthStatuses.value).every(Boolean)
 
       datasets.value = await decisionTreeApi.listDatasets()
+      configurationPresets.value = await decisionTreeApi.listConfigurationPresets()
       activeDataset.value = datasets.value[0] ?? null
 
       runs.value = await decisionTreeApi.listRuns()
@@ -141,15 +110,13 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   async function hydrateDataset(datasetId: string) {
-    const [profile, preview, originalTable, normalizedTable, eda, targetPreview, recommendation] =
+    const [profile, preview, originalTable, normalizedTable, eda] =
       await Promise.all([
         decisionTreeApi.profileDataset(datasetId),
         decisionTreeApi.previewDataset(datasetId),
         decisionTreeApi.getDatasetTable(datasetId, { page: 1, pageSize: datasetTablePageSize.value }),
         decisionTreeApi.getDatasetTable(datasetId, { page: 1, pageSize: datasetTablePageSize.value, normalized: true }),
         decisionTreeApi.getEdaVisualization(datasetId),
-        decisionTreeApi.getTargetConversionPreview(datasetId),
-        decisionTreeApi.recommendConfig(datasetId),
       ])
 
     activeDataset.value = profile
@@ -157,10 +124,11 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     datasetTable.value = originalTable
     normalizedDatasetTable.value = normalizedTable
     edaVisualization.value = eda
-    targetConversionPreview.value = targetPreview
-    recommendedConfig.value = recommendation
-    configEditorText.value = JSON.stringify(recommendation, null, 2)
+    targetConversionPreview.value = null
+    recommendedConfig.value = null
+    configEditorText.value = emptyConfigJson
     datasetTablePage.value = 1
+    selectedPreset.value = ''
   }
 
   async function loadDatasetTablePage(datasetId: string, page: number, normalized = false) {
@@ -204,6 +172,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       const uploaded = await decisionTreeApi.uploadDataset(file)
       datasets.value = [uploaded, ...datasets.value.filter((dataset) => dataset.id !== uploaded.id)]
       activeDataset.value = uploaded
+      lastUploadedFile.value = file
       await hydrateDataset(uploaded.id)
     } catch (error) {
       errorMessage.value = error instanceof Error ? error.message : 'Upload failed'
@@ -212,13 +181,38 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
-  async function trainUploadedFile(file: File) {
+  function getTrainingErrorMessage(rawMessage: string): string {
+    const lowered = rawMessage.toLowerCase()
+    if (lowered.includes('http 422') || lowered.includes('preset wajib')) {
+      return 'Pilih preset dataset terlebih dulu sebelum training.'
+    }
+
+    if (lowered.includes('dataset tidak cocok')) {
+      return 'Dataset tidak cocok dengan preset terpilih. Silakan ganti file atau pilih preset lain.'
+    }
+
+    return rawMessage
+  }
+
+  async function trainUploadedFile(file?: File) {
     isTraining.value = true
     errorMessage.value = ''
+    const trainFile = file ?? lastUploadedFile.value
 
     try {
+      if (!trainFile) {
+        throw new Error('Belum ada file untuk training. Upload file dulu, lalu klik Upload + Profile.')
+      }
+
+      if (!selectedPreset.value) {
+        throw new Error('HTTP 422: Preset wajib dipilih dari daftar preset sebelum training.')
+      }
+      if (!recommendedConfig.value) {
+        throw new Error('Rekomendasi konfigurasi belum siap. Muat ulang preset pilihan Anda.')
+      }
+
       const run = await decisionTreeApi.uploadAndTrain({
-        file,
+        file: trainFile,
         runName: `Interactive run ${new Date().toISOString()}`,
         configJson: configEditorText.value,
       })
@@ -226,9 +220,55 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       runs.value = [run, ...runs.value.filter((item) => item.id !== run.id)]
       await hydrateRun(run.id)
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'Training failed'
+      if (error instanceof Error) {
+        errorMessage.value = getTrainingErrorMessage(error.message)
+      } else {
+        errorMessage.value = 'Training failed'
+      }
     } finally {
       isTraining.value = false
+    }
+  }
+
+  async function selectDatasetPreset(presetId: string) {
+    if (!activeDataset.value?.id) {
+      throw new Error('Upload dataset terlebih dulu sebelum memilih preset.')
+    }
+
+    if (!configurationPresets.value.some((preset) => preset.id === presetId)) {
+      throw new Error('Preset tidak dikenal.')
+    }
+
+    selectedPreset.value = presetId
+    isLoadingPreset.value = true
+    errorMessage.value = ''
+
+    try {
+      const [config, preview] = await Promise.all([
+        decisionTreeApi.recommendConfig(activeDataset.value.id, presetId),
+        decisionTreeApi.getTargetConversionPreview(activeDataset.value.id, presetId),
+      ])
+
+      recommendedConfig.value = config
+      targetConversionPreview.value = preview
+      configEditorText.value = JSON.stringify(config, null, 2)
+    } catch (error) {
+      recommendedConfig.value = null
+      targetConversionPreview.value = null
+      configEditorText.value = emptyConfigJson
+      const message = error instanceof Error ? error.message : 'Gagal memuat konfigurasi preset.'
+      const lowered = message.toLowerCase()
+
+      if (lowered.includes('http 422') || lowered.includes('preset harus') || lowered.includes('preset wajib')) {
+        errorMessage.value = 'Backend mewajibkan preset dipilih. Pilih salah satu preset lalu lanjutkan.'
+      } else if (lowered.includes('dataset tidak cocok')) {
+        errorMessage.value = 'Dataset tidak cocok untuk preset ini. Silakan pilih preset lain atau ganti file.'
+      } else {
+        errorMessage.value = message
+      }
+      throw error
+    } finally {
+      isLoadingPreset.value = false
     }
   }
 
@@ -265,8 +305,15 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     latestTree,
     latestImportance,
     processWorkflowSteps,
-    configEditorText,
-    bootstrap,
+  configEditorText,
+  configurationPresets,
+  selectedPreset,
+  isLoadingPreset,
+  hasReadyTrainingContext,
+  hasCachedUploadedFile,
+  lastUploadedFileName,
+  selectDatasetPreset,
+  bootstrap,
     hydrateDataset,
     hydrateRun,
     uploadFile,

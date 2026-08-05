@@ -16,6 +16,8 @@ onMounted(() => {
   }
 })
 
+const presetOptions = computed(() => workspace.configurationPresets)
+
 const edaSummary = computed(() => workspace.edaVisualization?.summary ?? workspace.profileSummary)
 const datasetTableColumns = computed(() => workspace.datasetTable?.columns ?? [])
 const datasetTableRows = computed(() => workspace.datasetTable?.rows ?? [])
@@ -34,6 +36,8 @@ const activeTablePagination = computed(() => {
 })
 const missingColumns = computed(() => workspace.edaVisualization?.charts?.missing_ratio_by_column?.slice(0, 5) ?? [])
 const uniqueColumns = computed(() => workspace.edaVisualization?.charts?.unique_ratio_by_column?.slice(0, 5) ?? [])
+const canTrain = computed(() => workspace.hasReadyTrainingContext)
+const canUseCachedFile = computed(() => workspace.hasCachedUploadedFile)
 
 const summaryMetrics = computed(() => {
   const accuracy = workspace.latestMetrics?.accuracy
@@ -162,8 +166,12 @@ async function handleUpload() {
 }
 
 async function handleTrain() {
-  if (!selectedFile.value) return
-  await workspace.trainUploadedFile(selectedFile.value)
+  await workspace.trainUploadedFile(selectedFile.value ?? undefined)
+}
+
+function handlePresetChange(event: Event) {
+  const preset = (event.target as HTMLInputElement).value
+  void workspace.selectDatasetPreset(preset)
 }
 
 async function goToPreviousTablePage() {
@@ -230,6 +238,32 @@ async function goToNextTablePage() {
         description="Gunakan file Excel/CSV Anda sendiri. Untuk pengujian lokal, file yang sama juga sudah saya verifikasi dari folder docs ke backend localhost:8000."
       >
         <div class="space-y-4">
+          <div v-if="presetOptions.length" class="space-y-3">
+            <p class="text-sm text-slate-200">Pilih preset dataset (wajib):</p>
+            <div class="grid gap-2 sm:grid-cols-2">
+              <label
+                v-for="preset in presetOptions"
+                :key="preset.id"
+                class="flex cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-slate-100"
+              >
+                <input
+                  type="radio"
+                  name="dataset-preset"
+                  :value="preset.id"
+                  :checked="workspace.selectedPreset === preset.id"
+                  class="h-4 w-4 accent-cyan-300"
+                  :disabled="!workspace.activeDataset || workspace.isLoadingPreset"
+                  @change="handlePresetChange"
+                />
+                <div>
+                  <p class="font-semibold">{{ preset.label }}</p>
+                  <p class="text-xs text-slate-300">{{ preset.description }}</p>
+                </div>
+              </label>
+            </div>
+            <p v-if="workspace.isLoadingPreset" class="text-xs text-slate-300">Memuat rekomendasi preset...</p>
+          </div>
+
           <label class="block rounded-[1.5rem] border border-dashed border-white/15 bg-black/20 p-4">
             <span class="mb-3 flex items-center gap-2 text-sm font-medium text-slate-200">
               <FileUp class="h-4 w-4 text-cyan-200" />
@@ -254,11 +288,11 @@ async function goToNextTablePage() {
             </button>
             <button
               class="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-300/10 px-4 py-3 font-semibold text-emerald-100 transition hover:bg-emerald-300/16 disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="!selectedFile || workspace.isTraining"
+              :disabled="workspace.isTraining || !canTrain || (!selectedFile && !canUseCachedFile)"
               @click="handleTrain"
             >
               <Play class="h-4 w-4" />
-              {{ workspace.isTraining ? 'Training...' : 'Upload + Train' }}
+              {{ workspace.isTraining ? 'Training...' : canUseCachedFile ? 'Upload + Train' : 'Upload + Train (upload dulu)' }}
             </button>
           </div>
 

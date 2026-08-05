@@ -13,8 +13,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, init)
 
   if (!response.ok) {
-    const message = await response.text()
-    throw new Error(message || `Request failed with status ${response.status}`)
+    const rawBody = await response.text()
+    let message = rawBody
+
+    try {
+      const parsed = JSON.parse(rawBody)
+      if (typeof parsed?.detail === 'string') {
+        message = parsed.detail
+      } else if (typeof parsed?.message === 'string') {
+        message = parsed.message
+      } else if (Array.isArray(parsed?.detail) && parsed.detail[0]?.msg) {
+        message = parsed.detail.map((row: any) => row.msg).join(', ')
+      }
+    } catch {
+      // keep raw body
+    }
+
+    throw new Error(`HTTP ${response.status}: ${message || 'Request failed'}`)
   }
 
   const json = (await response.json()) as ApiEnvelope<T>
@@ -34,6 +49,9 @@ export const decisionTreeApi = {
   listDatasets() {
     return request<any[]>('/api/v1/datasets')
   },
+  listConfigurationPresets() {
+    return request<{ id: string; label: string; description: string }[]>('/api/v1/datasets/configuration-presets')
+  },
   profileDataset(datasetId: string) {
     return request<any>(`/api/v1/datasets/${datasetId}/profile`, {
       method: 'POST',
@@ -42,11 +60,15 @@ export const decisionTreeApi = {
   getEdaVisualization(datasetId: string) {
     return request<any>(`/api/v1/datasets/${datasetId}/eda-visualization`)
   },
-  getTargetConversionPreview(datasetId: string) {
-    return request<any>(`/api/v1/datasets/${datasetId}/target-conversion-preview`)
+  getTargetConversionPreview(datasetId: string, preset: string) {
+    const query = new URLSearchParams({ preset }).toString()
+
+    return request<any>(`/api/v1/datasets/${datasetId}/target-conversion-preview?${query}`)
   },
-  recommendConfig(datasetId: string) {
-    return request<any>(`/api/v1/datasets/${datasetId}/recommend-config`, {
+  recommendConfig(datasetId: string, preset: string) {
+    const query = new URLSearchParams({ preset }).toString()
+
+    return request<any>(`/api/v1/datasets/${datasetId}/recommend-config?${query}`, {
       method: 'POST',
     })
   },
