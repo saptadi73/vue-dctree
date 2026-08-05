@@ -9,6 +9,7 @@ import { useWorkspaceStore } from '../stores/workspace'
 
 const workspace = useWorkspaceStore()
 const selectedFile = ref<File | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
 
 onMounted(() => {
   if (!workspace.activeDataset && !workspace.isBootstrapping) {
@@ -162,7 +163,13 @@ function onFileChange(event: Event) {
 
 async function handleUpload() {
   if (!selectedFile.value) return
+  const uploadedFileName = selectedFile.value.name
   await workspace.uploadFile(selectedFile.value)
+
+  if (workspace.lastUploadedFileName === uploadedFileName) {
+    selectedFile.value = null
+    if (fileInput.value) fileInput.value.value = ''
+  }
 }
 
 async function handleTrain() {
@@ -270,12 +277,23 @@ async function goToNextTablePage() {
               Pilih dataset
             </span>
             <input
+              ref="fileInput"
               type="file"
               accept=".csv,.xlsx,.xls"
               class="block w-full text-sm text-slate-300 file:mr-4 file:rounded-full file:border-0 file:bg-cyan-300/12 file:px-4 file:py-2 file:font-medium file:text-cyan-100"
               @change="onFileChange"
             />
           </label>
+
+          <div
+            v-if="workspace.lastUploadedFileName"
+            class="flex items-center gap-2 rounded-2xl border border-cyan-300/20 bg-cyan-300/8 px-4 py-3 text-sm text-cyan-100"
+          >
+            <FileUp class="h-4 w-4 shrink-0" />
+            <span>
+              File tersimpan: <strong>{{ workspace.lastUploadedFileName }}</strong>. File ini akan dipakai saat training jika tidak ada file baru yang dipilih.
+            </span>
+          </div>
 
           <div class="grid gap-3 sm:grid-cols-2">
             <button

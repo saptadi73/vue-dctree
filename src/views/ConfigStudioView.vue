@@ -5,15 +5,30 @@ import { useWorkspaceStore } from '../stores/workspace'
 
 const workspace = useWorkspaceStore()
 
-onMounted(() => {
+onMounted(async () => {
   if (!workspace.activeDataset && !workspace.isBootstrapping) {
-    workspace.bootstrap()
+    await workspace.bootstrap()
   }
 })
 
+const targetColumn = computed(() =>
+  workspace.targetConversionPreview?.target_column ??
+  workspace.recommendedConfig?.task?.target_column ??
+  '',
+)
+
+const positiveClass = computed(() => {
+  const value = workspace.targetConversionPreview?.positive_class ?? workspace.recommendedConfig?.task?.positive_class
+  if (value) return value
+  return workspace.selectedPreset === 'india' ? 'Tidak berlaku (multiclass)' : '--'
+})
+
+function handlePresetChange(event: Event) {
+  void workspace.selectDatasetPreset((event.target as HTMLInputElement).value)
+}
+
 const configHighlights = computed(() => {
-  const target = workspace.targetConversionPreview?.target_column ?? 'Target not available'
-  const positiveClass = workspace.targetConversionPreview?.positive_class ?? '--'
+  const target = targetColumn.value || 'Pilih preset dataset'
   const preprocessingMode =
     workspace.preprocessingSummary?.preprocessing_config?.mode ??
     workspace.recommendedConfig?.preprocessing?.mode ??
@@ -28,7 +43,7 @@ const configHighlights = computed(() => {
     },
     {
       key: 'task.positive_class',
-      value: positiveClass,
+      value: positiveClass.value,
       description: 'Positive class untuk perhitungan metrik biner.',
     },
     {
@@ -55,6 +70,41 @@ const targetTotal = computed(() => {
 
 <template>
   <div class="mx-auto flex w-full max-w-[1180px] flex-col gap-6">
+    <SectionCard
+      eyebrow="Dataset Preset"
+      title="Pilih konfigurasi dataset"
+      description="Preset yang sama digunakan untuk rekomendasi konfigurasi dan preview konversi target."
+    >
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label
+          v-for="preset in workspace.configurationPresets"
+          :key="preset.id"
+          class="cursor-pointer rounded-[1.5rem] border p-4 transition"
+          :class="workspace.selectedPreset === preset.id
+            ? 'border-cyan-300/50 bg-cyan-300/10'
+            : 'border-white/10 bg-black/20 hover:border-white/20'"
+        >
+          <div class="flex items-start gap-3">
+            <input
+              type="radio"
+              name="config-preset"
+              :value="preset.id"
+              :checked="workspace.selectedPreset === preset.id"
+              :disabled="workspace.isLoadingPreset"
+              class="mt-1 accent-cyan-300"
+              @change="handlePresetChange"
+            />
+            <span>
+              <span class="block font-medium text-white">{{ preset.label }}</span>
+              <span class="mt-1 block text-sm leading-6 text-slate-300">{{ preset.description }}</span>
+            </span>
+          </div>
+        </label>
+      </div>
+      <p v-if="workspace.isLoadingPreset" class="mt-4 text-sm text-cyan-100">Memuat konfigurasi preset...</p>
+      <p v-if="workspace.errorMessage" class="mt-4 text-sm text-rose-200">{{ workspace.errorMessage }}</p>
+    </SectionCard>
+
     <section class="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]">
       <SectionCard
         eyebrow="Config Lens"
@@ -86,13 +136,13 @@ const targetTotal = computed(() => {
             <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
               <p class="text-sm text-slate-400">Target Column</p>
               <p class="mt-2 font-heading text-2xl text-white">
-                {{ workspace.targetConversionPreview?.target_column ?? '--' }}
+                {{ targetColumn || '--' }}
               </p>
             </div>
             <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
               <p class="text-sm text-slate-400">Positive Class</p>
               <p class="mt-2 font-heading text-2xl text-white">
-                {{ workspace.targetConversionPreview?.positive_class ?? '--' }}
+                {{ positiveClass }}
               </p>
             </div>
           </div>
