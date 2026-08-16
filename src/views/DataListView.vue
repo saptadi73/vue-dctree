@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import SectionCard from '../components/SectionCard.vue'
+import StatCard from '../components/StatCard.vue'
 import DataTable, { type DataTableColumn } from '../components/DataTable.vue'
 import { useWorkspaceStore } from '../stores/workspace'
 
@@ -30,6 +31,42 @@ const rows = computed(() =>
     original: item,
   })),
 )
+
+const summaryStats = computed(() => {
+  const items = workspace.manualSurveyResponses
+  const nonEmptyNumbers = (value: unknown) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : null
+
+  const cgpaValues = items
+    .map((item) => nonEmptyNumbers(item.current_cgpa))
+    .filter((value): value is number => value !== null)
+
+  const attendanceValues = items
+    .map((item) => nonEmptyNumbers(item.attendance_percentage))
+    .filter((value): value is number => value !== null)
+
+  const genderCounts = items.reduce<Record<string, number>>((acc, item) => {
+    const gender = String(item.gender ?? '').trim()
+    if (!gender) return acc
+    acc[gender] = (acc[gender] ?? 0) + 1
+    return acc
+  }, {})
+
+  const topGender = Object.entries(genderCounts).sort((a, b) => b[1] - a[1])[0]
+
+  return {
+    totalResponses: items.length,
+    avgCgpa:
+      cgpaValues.length > 0
+        ? cgpaValues.reduce((sum, value) => sum + value, 0) / cgpaValues.length
+        : 0,
+    avgAttendance:
+      attendanceValues.length > 0
+        ? attendanceValues.reduce((sum, value) => sum + value, 0) / attendanceValues.length
+        : 0,
+    topGender: topGender ? `${topGender[0]} (${topGender[1]})` : 'Belum ada',
+  }
+})
 
 const columns: DataTableColumn[] = [
   { key: 'name', label: 'Nama' },
@@ -128,35 +165,80 @@ async function confirmDelete() {
   <div class="space-y-6">
     <SectionCard
       eyebrow="Data List"
-      title="List data dengan searching dan pagination"
-      description="Halaman ini dibuat sebagai tampilan umum untuk daftar data survei manual, siap dikembangkan ke dataset lain di masa depan."
+      title="Manual Survey Dashboard"
+      description="Ringkasan operasional data survei manual dalam gaya dashboard berita: cepat dibaca, terukur, dan siap untuk pengambilan keputusan."
     >
-      <DataTable
-        :columns="columns"
-        :rows="rows"
-        :page-size="7"
-        search-placeholder="Cari nama, gender, atau CGPA..."
-        empty-message="Belum ada data respons manual."
-      >
-        <template #cell-actions="{ row }">
-          <div class="data-list__action-group">
-            <button
-              type="button"
-              class="data-list__action-btn data-list__action-btn--edit"
-              @click="openEdit(row)"
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              class="data-list__action-btn data-list__action-btn--delete"
-              @click="requestDelete(row)"
-            >
-              Delete
-            </button>
+      <div class="summary-dashboard">
+        <div class="summary-dashboard__header">
+          <div>
+            <p class="summary-dashboard__eyebrow">Executive summary</p>
+            <h3 class="summary-dashboard__title">Aktivitas respon survei</h3>
           </div>
-        </template>
-      </DataTable>
+          <div class="summary-dashboard__badge">Live data</div>
+        </div>
+
+        <div class="summary-dashboard__stats">
+          <StatCard
+            label="Total respon"
+            :value="String(summaryStats.totalResponses)"
+            note="Jumlah semua data yang masuk"
+            tone="cyan"
+          />
+          <StatCard
+            label="Avg CGPA"
+            :value="summaryStats.avgCgpa ? summaryStats.avgCgpa.toFixed(2) : '0.00'"
+            note="Rata-rata nilai saat ini"
+            tone="emerald"
+          />
+          <StatCard
+            label="Avg attendance"
+            :value="
+              summaryStats.avgAttendance ? `${summaryStats.avgAttendance.toFixed(1)}%` : '0.0%'
+            "
+            note="Kehadiran rata-rata responden"
+            tone="amber"
+          />
+          <StatCard
+            label="Gender dominan"
+            :value="summaryStats.topGender.split(' (')[0] || 'Belum ada'"
+            :note="
+              summaryStats.topGender === 'Belum ada'
+                ? 'Data gender belum tersedia'
+                : `Jumlah ${summaryStats.topGender}`
+            "
+            tone="violet"
+          />
+        </div>
+      </div>
+
+      <div class="mt-6">
+        <DataTable
+          :columns="columns"
+          :rows="rows"
+          :page-size="7"
+          search-placeholder="Cari nama, gender, atau CGPA..."
+          empty-message="Belum ada data respons manual."
+        >
+          <template #cell-actions="{ row }">
+            <div class="data-list__action-group">
+              <button
+                type="button"
+                class="data-list__action-btn data-list__action-btn--edit"
+                @click="openEdit(row)"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                class="data-list__action-btn data-list__action-btn--delete"
+                @click="requestDelete(row)"
+              >
+                Delete
+              </button>
+            </div>
+          </template>
+        </DataTable>
+      </div>
     </SectionCard>
 
     <div v-if="editingId" class="data-list__modal-backdrop" @click.self="closeEditModal()">
