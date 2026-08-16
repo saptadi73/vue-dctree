@@ -1,5 +1,10 @@
 # API Workflow Visualization
 
+Dokumen ini khusus workflow **upload dataset**. Workflow **input survei manual** sudah
+dipisahkan ke namespace `/api/v1/manual-survey` dan didokumentasikan di
+[`manual_survey_api_workflow.md`](manual_survey_api_workflow.md). Frontend harus membuat
+menu, state, dan cache API yang berbeda untuk kedua workflow tersebut.
+
 ## Status Dukungan Saat Ini
 
 Aplikasi sekarang **sudah menyediakan endpoint backend** untuk seluruh 7 langkah yang ada pada gambar, tetapi bentuk visualisasinya tetap dirender oleh frontend.

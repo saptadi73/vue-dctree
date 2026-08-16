@@ -12,6 +12,10 @@ type ApiEnvelope<T> = {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, init)
 
+  if (response.status === 204) {
+    return undefined as T
+  }
+
   if (!response.ok) {
     const rawBody = await response.text()
     let message = rawBody
@@ -32,8 +36,28 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(`HTTP ${response.status}: ${message || 'Request failed'}`)
   }
 
-  const json = (await response.json()) as ApiEnvelope<T>
-  return json.data
+  const rawText = await response.text()
+  if (!rawText) {
+    return undefined as T
+  }
+
+  try {
+    const parsed = JSON.parse(rawText) as ApiEnvelope<T> | T
+    if (parsed && typeof parsed === 'object' && 'success' in parsed && 'data' in parsed) {
+      return (parsed as ApiEnvelope<T>).data
+    }
+
+    return parsed as T
+  } catch {
+    return rawText as unknown as T
+  }
+}
+
+function withProjectParam(path: string, projectId?: string | null) {
+  if (!projectId) return path
+
+  const separator = path.includes('?') ? '&' : '?'
+  return `${path}${separator}project_id=${encodeURIComponent(projectId)}`
 }
 
 export const decisionTreeApi = {
@@ -50,7 +74,9 @@ export const decisionTreeApi = {
     return request<any[]>('/api/v1/datasets')
   },
   listConfigurationPresets() {
-    return request<{ id: string; label: string; description: string }[]>('/api/v1/datasets/configuration-presets')
+    return request<{ id: string; label: string; description: string }[]>(
+      '/api/v1/datasets/configuration-presets',
+    )
   },
   profileDataset(datasetId: string) {
     return request<any>(`/api/v1/datasets/${datasetId}/profile`, {
@@ -72,7 +98,10 @@ export const decisionTreeApi = {
       method: 'POST',
     })
   },
-  getDatasetTable(datasetId: string, options?: { page?: number; pageSize?: number; normalized?: boolean }) {
+  getDatasetTable(
+    datasetId: string,
+    options?: { page?: number; pageSize?: number; normalized?: boolean },
+  ) {
     const page = options?.page ?? 1
     const pageSize = options?.pageSize ?? 5
     const normalized = options?.normalized ? '&normalized=true' : ''
@@ -120,6 +149,113 @@ export const decisionTreeApi = {
     return request<any>('/api/v1/experiments/runs/upload-train', {
       method: 'POST',
       body: formData,
+    })
+  },
+
+  listManualSurveyResponses(projectId?: string | null) {
+    return request<any[]>(withProjectParam('/api/v1/manual-survey/responses', projectId))
+  },
+  createManualSurveyResponse(payload: Record<string, unknown>) {
+    return request<any>('/api/v1/manual-survey/responses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+  },
+  bulkCreateManualSurveyResponses(payload: {
+    project_id?: string | null
+    responses: Record<string, unknown>[]
+  }) {
+    return request<any>('/api/v1/manual-survey/responses/bulk', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+  },
+  getManualSurveyResponse(responseId: string) {
+    return request<any>(`/api/v1/manual-survey/responses/${responseId}`)
+  },
+  updateManualSurveyResponse(responseId: string, payload: Record<string, unknown>) {
+    return request<any>(`/api/v1/manual-survey/responses/${responseId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+  },
+  deleteManualSurveyResponse(responseId: string) {
+    return request<void>(`/api/v1/manual-survey/responses/${responseId}`, {
+      method: 'DELETE',
+    })
+  },
+  getManualSurveyDatasetTable(projectId?: string | null, page = 1, pageSize = 50) {
+    const base = `/api/v1/manual-survey/dataset/table?page=${page}&page_size=${pageSize}`
+    return request<any>(withProjectParam(base, projectId))
+  },
+  getManualSurveyDatasetPreview(projectId?: string | null, limit = 20) {
+    const base = `/api/v1/manual-survey/dataset/preview?limit=${limit}`
+    return request<any>(withProjectParam(base, projectId))
+  },
+  profileManualSurveyDataset(projectId?: string | null) {
+    const base = '/api/v1/manual-survey/dataset/profile'
+    return request<any>(withProjectParam(base, projectId), { method: 'POST' })
+  },
+  getManualSurveyEdaVisualization(projectId?: string | null) {
+    return request<any>(
+      withProjectParam('/api/v1/manual-survey/dataset/eda-visualization', projectId),
+    )
+  },
+  recommendManualSurveyConfig(projectId?: string | null) {
+    const base = '/api/v1/manual-survey/dataset/recommend-config'
+    return request<any>(withProjectParam(base, projectId), { method: 'POST' })
+  },
+  getManualSurveyTargetConversionPreview(projectId?: string | null) {
+    return request<any>(
+      withProjectParam('/api/v1/manual-survey/dataset/target-conversion-preview', projectId),
+    )
+  },
+  listManualSurveyTrainingRuns(projectId?: string | null) {
+    const base = '/api/v1/manual-survey/training/runs'
+    return request<any[]>(withProjectParam(base, projectId))
+  },
+  getManualSurveyTrainingRun(runId: string) {
+    return request<any>(`/api/v1/manual-survey/training/runs/${runId}`)
+  },
+  getManualSurveyTrainingRunPreprocessingSummary(runId: string) {
+    return request<any>(`/api/v1/manual-survey/training/runs/${runId}/preprocessing-summary`)
+  },
+  getManualSurveyTrainingRunMetrics(runId: string) {
+    return request<any>(`/api/v1/manual-survey/training/runs/${runId}/metrics`)
+  },
+  getManualSurveyTrainingRunConfusionMatrix(runId: string) {
+    return request<any>(`/api/v1/manual-survey/training/runs/${runId}/confusion-matrix`)
+  },
+  getManualSurveyTrainingRunFeatureImportance(runId: string) {
+    return request<any>(`/api/v1/manual-survey/training/runs/${runId}/feature-importance`)
+  },
+  getManualSurveyTrainingRunTreeVisualization(runId: string) {
+    return request<any>(`/api/v1/manual-survey/training/runs/${runId}/tree-visualization`)
+  },
+  getManualSurveyTrainingRunWorkflow(runId: string) {
+    return request<any>(`/api/v1/manual-survey/training/runs/${runId}/workflow-visualization`)
+  },
+  createManualSurveyTrainingRun(payload: {
+    run_name: string
+    project_id?: string | null
+    response_ids?: string[]
+    config?: Record<string, unknown> | null
+  }) {
+    return request<any>('/api/v1/manual-survey/training/runs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
     })
   },
 }

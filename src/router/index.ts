@@ -1,8 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import ApiAtlasView from '../views/ApiAtlasView.vue'
 import ConfigStudioView from '../views/ConfigStudioView.vue'
+import DataListView from '../views/DataListView.vue'
 import EdaView from '../views/EdaView.vue'
 import EvaluationLabView from '../views/EvaluationLabView.vue'
+import ManualSurveyView from '../views/ManualSurveyView.vue'
 import OverviewView from '../views/OverviewView.vue'
 import PipelineView from '../views/PipelineView.vue'
 import TreeExplorerView from '../views/TreeExplorerView.vue'
@@ -50,6 +52,16 @@ const router = createRouter({
       path: '/workflow-detail',
       name: 'workflow-detail',
       component: WorkflowDetailView,
+    },
+    {
+      path: '/manual-survey',
+      name: 'manual-survey',
+      component: ManualSurveyView,
+    },
+    {
+      path: '/data-list',
+      name: 'data-list',
+      component: DataListView,
     },
   ],
 })
