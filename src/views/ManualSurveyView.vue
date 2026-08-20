@@ -96,6 +96,15 @@ const treeNodes = computed(() => workspace.manualSurveyTreeNodes ?? [])
 const treeEdges = computed(() => workspace.manualSurveyTreeEdges ?? [])
 const hasActiveProject = computed(() => Boolean(activeProjectId.value))
 
+function getRunProjectId(run: Record<string, any>) {
+  return (
+    run.project_id ??
+    run.config_json?.source_metadata?.project_id ??
+    run.config?.source_metadata?.project_id ??
+    'project_id tidak tersedia'
+  )
+}
+
 async function loadProjects() {
   projectLoading.value = true
   try {
@@ -637,7 +646,7 @@ onMounted(() => {
               <UserRound class="h-4 w-4 text-cyan-200" /> {{ run.source_type || 'manual_survey' }}
             </p>
             <p class="flex items-center gap-2">
-              <Database class="h-4 w-4 text-cyan-200" /> {{ run.project_id || 'project_id null' }}
+              <Database class="h-4 w-4 text-cyan-200" /> {{ getRunProjectId(run) }}
             </p>
           </div>
         </div>
