@@ -13,14 +13,15 @@ dibungkus sebagai `{ "success": true, "data": ..., "meta": ... }`.
 3. **Training**: pemilihan data, konfirmasi config, dan eksekusi training.
 4. **Hasil Training**: daftar run, metrik, confusion matrix, feature importance, dan pohon keputusan.
 
-Gunakan `project_id` sebagai filter aktif yang sama pada seluruh halaman. Jika tidak
-dikirim, backend memproses seluruh respons survei yang tersedia.
+Halaman manual survey tidak meminta pengguna mengisi `project_id`. Frontend menghilangkan
+field tersebut dari payload input dan backend otomatis memakai proyek default
+`Survei Manual Indonesia`, serta membuatnya bila belum tersedia. `project_id` hanya dipakai
+secara internal oleh backend atau sebagai filter opsional untuk kebutuhan administrasi.
 
 ## Model isian
 
 ```ts
 type ManualSurveyInput = {
-  project_id?: string | null;
   name: string;
   age: number;                         // 15–100
   gender: string;
@@ -37,6 +38,40 @@ type ManualSurveyInput = {
 ```
 
 Data hasil baca juga memiliki `id`, `created_at`, dan `updated_at`.
+
+## Hasil smoke test dataset teman.xlsx
+
+Smoke test dijalankan pada 20 Agustus 2026 menggunakan `dataset teman.xlsx`.
+Kolom Excel `Nama`, `previous_sem_CGPA`, dan `current_sem_CGPA` dipetakan ke
+`name`, `previous_cgpa`, dan `current_cgpa`. `project_id` sengaja tidak dikirim
+untuk memastikan pengisian otomatis berjalan.
+
+| Pemeriksaan | Hasil |
+|---|---:|
+| Baris dibaca dari Excel | 6 |
+| Baris berhasil disimpan | 6 |
+| Proyek otomatis | `Survei Manual Indonesia` |
+| Kolom hasil profiling | 12 |
+| Sel kosong | 0 |
+| Baris duplikat | 0 |
+
+Data uji yang digunakan:
+
+| Nama | Gender | Usia | Previous CGPA | Current CGPA |
+|---|---|---:|---:|---:|
+| Ridwan Hakim | male | 21 | 3.1 | 3.3 |
+| Fathur Prayoga | male | 20 | 2.8 | 2.7 |
+| Reiza Pradipta | male | 22 | 3.7 | 3.8 |
+| Nirmala Devi | female | 21 | 3.0 | 3.1 |
+| Milva Apriyani | female | 23 | 2.5 | 2.4 |
+| Suci Indriani | female | 20 | 3.5 | 3.6 |
+
+Endpoint yang diverifikasi:
+
+1. `GET /health/ready` menghasilkan status database `connected`.
+2. `POST /manual-survey/responses/bulk` berhasil tanpa `project_id`.
+3. `GET /manual-survey/dataset/table?project_id={uuid}` menghasilkan 6 baris.
+4. `POST /manual-survey/dataset/profile?project_id={uuid}` menghasilkan 0 sel kosong dan 0 duplikasi.
 
 | Nilai current CGPA | Kelas |
 |---:|---|
@@ -59,7 +94,6 @@ Contoh tambah satu data:
 
 ```json
 {
-  "project_id": null,
   "name": "Budi Santoso",
   "age": 20,
   "gender": "Laki-laki",
@@ -75,7 +109,8 @@ Contoh tambah satu data:
 }
 ```
 
-Bulk memakai bentuk `{ "project_id": null, "responses": [ManualSurveyInput, ...] }`.
+Bulk memakai bentuk `{ "responses": [ManualSurveyInput, ...] }`. `project_id` tidak perlu
+dikirim pada create tunggal, bulk import, maupun training dari halaman manual survey.
 Payload `PATCH` hanya perlu berisi field yang berubah.
 
 ## Display dan analisis dataset database
@@ -156,7 +191,6 @@ run dengan `source_type = "upload"`; run survei manual tidak dapat dibuka dari m
 
 ```ts
 type ManualSurveyPageState = {
-  projectId: string | null;
   tablePage: number;
   selectedResponseIds: string[];
   profile: unknown | null;
@@ -168,7 +202,8 @@ type ManualSurveyPageState = {
 ```
 
 Reset `profile`, `eda`, `config`, dan `targetPreview` setelah create, update, atau delete
-karena data sumber sudah berubah. Reset state analisis juga ketika `projectId` berganti.
+karena data sumber sudah berubah. Halaman manual survey selalu memuat dataset proyek default
+dan tidak menyediakan pergantian `projectId` kepada pengguna.
 Jangan menggabungkan cache query survei manual dengan cache `/datasets` atau
 `/experiments` milik workflow upload.
 

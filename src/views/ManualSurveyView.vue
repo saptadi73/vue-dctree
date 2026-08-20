@@ -5,7 +5,6 @@ import SectionCard from '../components/SectionCard.vue'
 import { useWorkspaceStore } from '../stores/workspace'
 
 const workspace = useWorkspaceStore()
-const projectId = ref('')
 const isSubmitting = ref(false)
 const bulkText = ref('')
 const bulkImportState = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
@@ -93,17 +92,10 @@ function getConfusionRowLabel(rowIndex: number) {
   return typeof label === 'string' && label.length > 0 ? label : `Row ${rowIndex + 1}`
 }
 
-function applyProject() {
-  const trimmed = projectId.value.trim()
-  workspace.manualSurveyProjectId = trimmed || null
-  void refreshManualSurveyData()
-}
-
 async function refreshManualSurveyData() {
-  const activeProjectId = projectId.value.trim() || null
   try {
-    await workspace.loadManualSurveyResponses(activeProjectId)
-    await workspace.refreshManualSurveyAnalysis(activeProjectId)
+    await workspace.loadManualSurveyResponses(null)
+    await workspace.refreshManualSurveyAnalysis(null)
   } catch (error) {
     console.error('Manual survey refresh failed', error)
   }
@@ -116,7 +108,6 @@ async function submitForm() {
 
   try {
     await workspace.createManualSurveyResponse({
-      project_id: projectId.value.trim() || null,
       ...manualForm,
     })
     Object.assign(manualForm, {
@@ -203,7 +194,6 @@ async function submitBulk() {
     }
 
     await workspace.bulkCreateManualSurveyResponses({
-      project_id: projectId.value.trim() || null,
       responses,
     })
 
@@ -238,7 +228,6 @@ async function trainSelectedData() {
 
   await workspace.trainManualSurveyRun({
     run_name: `Manual Survey Run ${new Date().toISOString()}`,
-    project_id: projectId.value.trim() || null,
     response_ids: selected,
     config: workspace.manualSurveyConfig ?? undefined,
   })
@@ -262,22 +251,9 @@ onMounted(() => {
       description="Halaman ini berdiri sendiri dari upload dataset; semua data respon, analisis profil, rekomendasi config, dan training masuk ke namespace backend /api/v1/manual-survey."
     >
       <div class="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-          <label class="mb-2 block text-sm font-medium text-slate-200">Project ID aktif</label>
-          <div class="flex gap-3">
-            <input
-              v-model="projectId"
-              class="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-slate-400"
-              placeholder="kosong = semua proyek"
-            />
-            <button
-              type="button"
-              @click="applyProject"
-              class="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-semibold text-cyan-100"
-            >
-              Terapkan
-            </button>
-          </div>
+        <div class="rounded-[1.5rem] border border-cyan-300/20 bg-cyan-300/5 p-4 text-sm text-cyan-100">
+          Data manual survey otomatis menggunakan proyek default <strong>Survei Manual Indonesia</strong>.
+          Project ID tidak perlu diisi.
         </div>
 
         <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
