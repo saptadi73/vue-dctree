@@ -94,6 +94,13 @@ const workflowSteps = computed(() => workspace.manualSurveyWorkflowSteps ?? [])
 const preprocessingSummary = computed(() => workspace.manualSurveyPreprocessingSummary ?? null)
 const treeNodes = computed(() => workspace.manualSurveyTreeNodes ?? [])
 const treeEdges = computed(() => workspace.manualSurveyTreeEdges ?? [])
+const visibleTrainingRuns = computed(() =>
+  [...workspace.manualSurveyRuns]
+    .sort((left, right) =>
+      String(right.created_at ?? '').localeCompare(String(left.created_at ?? '')),
+    )
+    .slice(0, 6),
+)
 const hasActiveProject = computed(() => Boolean(activeProjectId.value))
 
 function getRunProjectId(run: Record<string, any>) {
@@ -623,7 +630,7 @@ onMounted(() => {
 
       <div v-else class="grid gap-4 md:grid-cols-2">
         <div
-          v-for="run in workspace.manualSurveyRuns"
+          v-for="run in visibleTrainingRuns"
           :key="run.id"
           class="cursor-pointer rounded-[1.4rem] border border-white/10 bg-black/20 p-4 transition hover:border-cyan-300/30 hover:bg-black/30"
           @click="selectRun(run.id)"
