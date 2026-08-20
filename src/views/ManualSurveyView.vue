@@ -10,7 +10,7 @@ const projectSearch = ref('')
 const projectName = ref('')
 const projectDescription = ref('')
 const projects = ref<Record<string, unknown>[]>([])
-const activeProjectId = ref<string | null>(null)
+const activeProjectId = ref<string | null>(workspace.manualSurveyProjectId)
 const projectLoading = ref(false)
 const projectMessage = ref('')
 const isSubmitting = ref(false)
@@ -283,7 +283,12 @@ async function selectRun(runId: string) {
 }
 
 onMounted(() => {
-  void loadProjects()
+  void loadProjects().then(() => {
+    if (activeProjectId.value) {
+      const project = projects.value.find((item) => String(item.id) === activeProjectId.value)
+      if (project) void selectProject(project)
+    }
+  })
 })
 </script>
 

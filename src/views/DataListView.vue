@@ -14,7 +14,7 @@ const deleteStage = ref<'first' | 'final'>('first')
 const projectSearch = ref('')
 const projects = ref<Record<string, unknown>[]>([])
 const projectLoading = ref(false)
-const selectedProjectId = ref<string | null>(null)
+const selectedProjectId = ref<string | null>(workspace.manualSurveyProjectId)
 
 async function searchProjects() {
   projectLoading.value = true
@@ -33,8 +33,11 @@ async function selectProject(project: Record<string, unknown>) {
 
 onMounted(async () => {
   await searchProjects()
+  if (selectedProjectId.value) {
+    await workspace.loadManualSurveyResponses(selectedProjectId.value)
+  }
   if (!workspace.manualSurveyResponses.length && !workspace.isBootstrapping) {
-    await workspace.loadManualSurveyResponses(null)
+    if (!selectedProjectId.value) await workspace.loadManualSurveyResponses(null)
   }
 })
 
