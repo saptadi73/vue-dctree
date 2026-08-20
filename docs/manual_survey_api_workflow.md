@@ -13,15 +13,107 @@ dibungkus sebagai `{ "success": true, "data": ..., "meta": ... }`.
 3. **Training**: pemilihan data, konfirmasi config, dan eksekusi training.
 4. **Hasil Training**: daftar run, metrik, confusion matrix, feature importance, dan pohon keputusan.
 
-Halaman manual survey tidak meminta pengguna mengisi `project_id`. Frontend menghilangkan
-field tersebut dari payload input dan backend otomatis memakai proyek default
-`Survei Manual Indonesia`, serta membuatnya bila belum tersedia. `project_id` hanya dipakai
-secara internal oleh backend atau sebagai filter opsional untuk kebutuhan administrasi.
+Gunakan `project_id` sebagai filter aktif yang sama pada seluruh halaman. Pada endpoint
+input (`POST /responses` dan `POST /responses/bulk`), jika `project_id` tidak dikirim
+atau bernilai `null`, backend otomatis memakai proyek default `Survei Manual Indonesia`
+ dan membuatnya bila belum tersedia. Pengguna tidak perlu mengisi UUID secara manual.
+
+Frontend menampilkan `name` sebagai label pilihan project dan menyimpan `id` sebagai
+nilai teknis aktif. Gunakan `GET /api/v1/projects?search={kata_kunci}` untuk mencari
+nama project. Setelah pengguna memilih project, gunakan `id` hasil pilihan tersebut
+untuk memuat daftar respons, analisis, dan training.
+
+## Workflow project end-to-end
+
+Project harus dipilih sebelum data survey dimasukkan dan sebelum data diproses.
+Pengguna hanya melihat nama project; UUID diproses dan disimpan oleh frontend.
+
+### 1. Buat project
+
+Pengguna mengisi nama project dan, bila perlu, deskripsi. Frontend mengirim:
+
+```http
+POST /api/v1/projects
+Content-Type: application/json
+```
+
+```json
+{
+  "name": "Survei Petani Sulawesi Utara",
+  "description": "Dataset digitalisasi budidaya dan pendapatan petani"
+}
+```
+
+Respons mengandung `id` dan `name`. Frontend menyimpan keduanya sebagai opsi project,
+tetapi menampilkan `name` kepada pengguna.
+
+### 2. Pilih project untuk mengisi data survey
+
+Frontend memuat opsi project melalui `GET /api/v1/projects` atau mencari dengan
+`GET /api/v1/projects?search={kata_kunci}`. Pengguna memilih satu project, lalu
+frontend menyimpan `activeProjectId` dari field `id` pilihan tersebut.
+
+Semua input survey berikutnya wajib menggunakan `activeProjectId` yang sama:
+
+```json
+{
+  "project_id": "<activeProjectId>",
+  "name": "Budi Santoso",
+  "age": 20,
+  "gender": "Laki-laki",
+  "daily_screen_time_hours": 6,
+  "social_media_hours": 2,
+  "online_study_hours": 2,
+  "gaming_hours": 1,
+  "sleep_hours": 8,
+  "attendance_percentage": 90,
+  "offline_study_hours": 2,
+  "previous_cgpa": 3.1,
+  "current_cgpa": 3.2
+}
+```
+
+Gunakan `POST /api/v1/manual-survey/responses` untuk satu baris atau
+`POST /api/v1/manual-survey/responses/bulk` untuk banyak baris. Jangan mengganti
+project di tengah pengisian jika data tersebut masih bagian dari dataset yang sama.
+
+### 3. Pilih project untuk diproses
+
+Pada halaman daftar respons, analisis, dan training, frontend kembali menampilkan
+project selector. Project yang dipilih harus menjadi `activeProjectId` yang sama dengan
+project pada tahap input. Setelah dipilih, panggil endpoint dengan query berikut:
+
+```http
+GET /api/v1/manual-survey/responses?project_id={activeProjectId}
+GET /api/v1/manual-survey/dataset/table?project_id={activeProjectId}
+GET /api/v1/manual-survey/dataset/preview?project_id={activeProjectId}
+POST /api/v1/manual-survey/dataset/profile?project_id={activeProjectId}
+```
+
+Training juga wajib menggunakan project yang sama:
+
+```json
+{
+  "run_name": "Training Survei Petani Sulawesi Utara",
+  "project_id": "<activeProjectId>"
+}
+```
+
+### Aturan validasi frontend
+
+1. Tombol simpan data survey nonaktif sampai project dipilih.
+2. Tombol analisis dan training nonaktif sampai project aktif dipilih.
+3. Saat project berganti, frontend mengosongkan list, preview, profil, dan hasil analisis
+   lama sebelum memuat data project baru.
+4. Jika project belum memiliki respons, tampilkan pesan bahwa data survey perlu diisi
+   terlebih dahulu.
+5. Jangan meminta pengguna mengetik UUID; UUID hanya berasal dari respons API.
 
 ## Model isian
 
 ```ts
 type ManualSurveyInput = {
+  project_id?: string | null;
   name: string;
   age: number;                         // 15–100
   gender: string;
@@ -94,6 +186,7 @@ Contoh tambah satu data:
 
 ```json
 {
+  "project_id": null,
   "name": "Budi Santoso",
   "age": 20,
   "gender": "Laki-laki",
@@ -109,8 +202,7 @@ Contoh tambah satu data:
 }
 ```
 
-Bulk memakai bentuk `{ "responses": [ManualSurveyInput, ...] }`. `project_id` tidak perlu
-dikirim pada create tunggal, bulk import, maupun training dari halaman manual survey.
+Bulk memakai bentuk `{ "project_id": null, "responses": [ManualSurveyInput, ...] }`.
 Payload `PATCH` hanya perlu berisi field yang berubah.
 
 ## Display dan analisis dataset database
@@ -191,6 +283,7 @@ run dengan `source_type = "upload"`; run survei manual tidak dapat dibuka dari m
 
 ```ts
 type ManualSurveyPageState = {
+  projectId: string | null;
   tablePage: number;
   selectedResponseIds: string[];
   profile: unknown | null;
@@ -202,8 +295,7 @@ type ManualSurveyPageState = {
 ```
 
 Reset `profile`, `eda`, `config`, dan `targetPreview` setelah create, update, atau delete
-karena data sumber sudah berubah. Halaman manual survey selalu memuat dataset proyek default
-dan tidak menyediakan pergantian `projectId` kepada pengguna.
+karena data sumber sudah berubah. Reset state analisis juga ketika `projectId` berganti.
 Jangan menggabungkan cache query survei manual dengan cache `/datasets` atau
 `/experiments` milik workflow upload.
 

@@ -3,8 +3,16 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { Check, Database, FileText, Play, Plus, Trash2, UserRound } from '@lucide/vue'
 import SectionCard from '../components/SectionCard.vue'
 import { useWorkspaceStore } from '../stores/workspace'
+import { decisionTreeApi } from '../lib/api'
 
 const workspace = useWorkspaceStore()
+const projectSearch = ref('')
+const projectName = ref('')
+const projectDescription = ref('')
+const projects = ref<Record<string, unknown>[]>([])
+const activeProjectId = ref<string | null>(null)
+const projectLoading = ref(false)
+const projectMessage = ref('')
 const isSubmitting = ref(false)
 const bulkText = ref('')
 const bulkImportState = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
@@ -86,6 +94,38 @@ const workflowSteps = computed(() => workspace.manualSurveyWorkflowSteps ?? [])
 const preprocessingSummary = computed(() => workspace.manualSurveyPreprocessingSummary ?? null)
 const treeNodes = computed(() => workspace.manualSurveyTreeNodes ?? [])
 const treeEdges = computed(() => workspace.manualSurveyTreeEdges ?? [])
+const hasActiveProject = computed(() => Boolean(activeProjectId.value))
+
+async function loadProjects() {
+  projectLoading.value = true
+  try {
+    const result = await decisionTreeApi.listProjects(projectSearch.value)
+    projects.value = Array.isArray(result) ? result : []
+  } finally {
+    projectLoading.value = false
+  }
+}
+
+async function selectProject(project: Record<string, unknown>) {
+  activeProjectId.value = String(project.id)
+  workspace.manualSurveyProjectId = activeProjectId.value
+  workspace.manualSurveyResponses = []
+  workspace.resetManualSurveyAnalysis()
+  projectMessage.value = `Project aktif: ${String(project.name ?? 'Tanpa nama')}`
+  await refreshManualSurveyData()
+}
+
+async function createProject() {
+  if (!projectName.value.trim()) return
+  const project = await decisionTreeApi.createProject({
+    name: projectName.value.trim(),
+    description: projectDescription.value.trim(),
+  })
+  projectName.value = ''
+  projectDescription.value = ''
+  await loadProjects()
+  await selectProject(project)
+}
 
 function getConfusionRowLabel(rowIndex: number) {
   const label = confusionLabels.value[rowIndex]
@@ -94,8 +134,8 @@ function getConfusionRowLabel(rowIndex: number) {
 
 async function refreshManualSurveyData() {
   try {
-    await workspace.loadManualSurveyResponses(null)
-    await workspace.refreshManualSurveyAnalysis(null)
+    await workspace.loadManualSurveyResponses(activeProjectId.value)
+    await workspace.refreshManualSurveyAnalysis(activeProjectId.value)
   } catch (error) {
     console.error('Manual survey refresh failed', error)
   }
@@ -108,6 +148,7 @@ async function submitForm() {
 
   try {
     await workspace.createManualSurveyResponse({
+      project_id: activeProjectId.value,
       ...manualForm,
     })
     Object.assign(manualForm, {
@@ -194,6 +235,7 @@ async function submitBulk() {
     }
 
     await workspace.bulkCreateManualSurveyResponses({
+      project_id: activeProjectId.value,
       responses,
     })
 
@@ -228,6 +270,7 @@ async function trainSelectedData() {
 
   await workspace.trainManualSurveyRun({
     run_name: `Manual Survey Run ${new Date().toISOString()}`,
+    project_id: activeProjectId.value,
     response_ids: selected,
     config: workspace.manualSurveyConfig ?? undefined,
   })
@@ -239,7 +282,7 @@ async function selectRun(runId: string) {
 }
 
 onMounted(() => {
-  void refreshManualSurveyData()
+  void loadProjects()
 })
 </script>
 
@@ -251,9 +294,20 @@ onMounted(() => {
       description="Halaman ini berdiri sendiri dari upload dataset; semua data respon, analisis profil, rekomendasi config, dan training masuk ke namespace backend /api/v1/manual-survey."
     >
       <div class="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div class="rounded-[1.5rem] border border-cyan-300/20 bg-cyan-300/5 p-4 text-sm text-cyan-100">
-          Data manual survey otomatis menggunakan proyek default <strong>Survei Manual Indonesia</strong>.
-          Project ID tidak perlu diisi.
+        <div class="rounded-[1.5rem] border border-cyan-300/20 bg-cyan-300/5 p-4">
+          <p class="mb-3 text-sm font-semibold text-cyan-100">Pilih atau buat project</p>
+          <div class="flex flex-wrap gap-2">
+            <input v-model="projectSearch" @input="loadProjects" placeholder="Cari nama project..." class="min-w-[220px] flex-1 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white" />
+            <button v-for="project in projects" :key="String(project.id)" type="button" @click="selectProject(project)" class="rounded-2xl border border-cyan-300/20 px-3 py-2 text-sm text-cyan-100" :class="{ 'ring-2 ring-cyan-300': activeProjectId === String(project.id) }">
+              {{ project.name || project.project_name || 'Tanpa nama' }}
+            </button>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <input v-model="projectName" placeholder="Nama project baru" class="flex-1 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white" />
+            <input v-model="projectDescription" placeholder="Deskripsi (opsional)" class="flex-1 rounded-2xl border border-white/10 bg-slate-950/60 bg-slate-950/60 px-4 py-3 text-sm text-white" />
+            <button type="button" :disabled="!projectName.trim() || projectLoading" @click="createProject" class="rounded-2xl bg-emerald-300/10 px-4 py-3 text-sm font-semibold text-emerald-100 disabled:opacity-50">Buat project</button>
+          </div>
+          <p class="mt-2 text-xs text-slate-400">{{ projectMessage || (projectLoading ? 'Memuat project...' : 'Pilih project sebelum mengisi survey.') }}</p>
         </div>
 
         <div class="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
@@ -329,7 +383,7 @@ onMounted(() => {
           <div class="md:col-span-2 flex justify-end">
             <button
               type="submit"
-              :disabled="isSubmitting"
+              :disabled="isSubmitting || !hasActiveProject"
               class="inline-flex items-center gap-2 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 font-semibold text-emerald-100 disabled:opacity-60"
             >
               <Plus class="h-4 w-4" />
@@ -389,7 +443,7 @@ onMounted(() => {
           <button
             type="button"
             @click="submitBulk"
-            :disabled="bulkImportState === 'loading'"
+            :disabled="bulkImportState === 'loading' || !hasActiveProject"
             class="inline-flex items-center gap-2 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 font-semibold text-cyan-100 disabled:opacity-60"
           >
             <FileText class="h-4 w-4" />
@@ -502,7 +556,7 @@ onMounted(() => {
         <button
           type="button"
           @click="trainSelectedData"
-          :disabled="workspace.manualSurveySelectedResponseIds.length < 2"
+          :disabled="workspace.manualSurveySelectedResponseIds.length < 2 || !hasActiveProject"
           class="inline-flex items-center gap-2 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 font-semibold text-amber-100 disabled:opacity-50"
         >
           <Play class="h-4 w-4" />

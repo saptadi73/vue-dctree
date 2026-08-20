@@ -351,14 +351,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   async function loadManualSurveyResponses(projectId: string | null = manualSurveyProjectId.value) {
     manualSurveyProjectId.value = projectId
 
-    if (!projectId) {
-      manualSurveyResponses.value = []
-      manualSurveySelectedResponseIds.value = []
-      manualSurveyRuns.value = []
-      manualSurveyActiveRun.value = null
-      return
-    }
-
     const [responses, runs] = await Promise.all([
       decisionTreeApi.listManualSurveyResponses(projectId),
       decisionTreeApi.listManualSurveyTrainingRuns(projectId),
@@ -372,14 +364,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     projectId: string | null = manualSurveyProjectId.value,
   ) {
     manualSurveyProjectId.value = projectId
-
-    if (!projectId) {
-      resetManualSurveyAnalysis()
-      manualSurveySelectedResponseIds.value = []
-      manualSurveyRuns.value = []
-      manualSurveyActiveRun.value = null
-      return
-    }
 
     try {
       const [table, preview, profile, eda, config, targetPreview] = await Promise.all([

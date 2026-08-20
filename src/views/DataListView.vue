@@ -1,21 +1,44 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import SectionCard from '../components/SectionCard.vue'
 import StatCard from '../components/StatCard.vue'
 import DataTable, { type DataTableColumn } from '../components/DataTable.vue'
 import { useWorkspaceStore } from '../stores/workspace'
+import { decisionTreeApi } from '../lib/api'
 
 const workspace = useWorkspaceStore()
 const editingId = ref<string | null>(null)
 const editDraft = ref<Record<string, unknown>>({})
 const deleteCandidate = ref<{ id: string; name: string } | null>(null)
 const deleteStage = ref<'first' | 'final'>('first')
+const projectSearch = ref('')
+const projects = ref<Record<string, unknown>[]>([])
+const projectLoading = ref(false)
+const selectedProjectId = ref<string | null>(null)
 
-onMounted(() => {
+async function searchProjects() {
+  projectLoading.value = true
+  try {
+    const result = await decisionTreeApi.listProjects(projectSearch.value)
+    projects.value = Array.isArray(result) ? result : []
+  } finally {
+    projectLoading.value = false
+  }
+}
+
+async function selectProject(project: Record<string, unknown>) {
+  selectedProjectId.value = String(project.id)
+  await workspace.loadManualSurveyResponses(selectedProjectId.value)
+}
+
+onMounted(async () => {
+  await searchProjects()
   if (!workspace.manualSurveyResponses.length && !workspace.isBootstrapping) {
-    void workspace.loadManualSurveyResponses(null)
+    await workspace.loadManualSurveyResponses(null)
   }
 })
+
+watch(projectSearch, () => void searchProjects())
 
 const rows = computed(() =>
   workspace.manualSurveyResponses.map((item) => ({
@@ -212,6 +235,27 @@ async function confirmDelete() {
       </div>
 
       <div class="mt-6">
+        <div class="mb-4 flex flex-wrap items-center gap-3">
+          <input
+            v-model="projectSearch"
+            type="search"
+            placeholder="Cari nama project..."
+            class="min-w-[240px] flex-1 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-400"
+          />
+          <span v-if="projectLoading" class="text-sm text-slate-400">Memuat project...</span>
+          <div v-else class="flex flex-wrap gap-2">
+            <button
+              v-for="project in projects"
+              :key="String(project.id)"
+              type="button"
+              class="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-sm text-cyan-100"
+              :class="{ 'ring-2 ring-cyan-300': selectedProjectId === String(project.id) }"
+              @click="selectProject(project)"
+            >
+              {{ project.name || project.project_name || 'Tanpa nama' }}
+            </button>
+          </div>
+        </div>
         <DataTable
           :columns="columns"
           :rows="rows"

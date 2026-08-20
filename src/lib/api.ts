@@ -155,6 +155,19 @@ export const decisionTreeApi = {
   listManualSurveyResponses(projectId?: string | null) {
     return request<any[]>(withProjectParam('/api/v1/manual-survey/responses', projectId))
   },
+  listProjects(search = '') {
+    const query = search.trim()
+    return request<any[]>(
+      query ? `/api/v1/projects?search=${encodeURIComponent(query)}` : '/api/v1/projects',
+    )
+  },
+  createProject(payload: { name: string; description?: string }) {
+    return request<any>('/api/v1/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  },
   createManualSurveyResponse(payload: Record<string, unknown>) {
     return request<any>('/api/v1/manual-survey/responses', {
       method: 'POST',
