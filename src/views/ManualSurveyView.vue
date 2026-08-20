@@ -326,6 +326,32 @@ onMounted(() => {
         title="Tambah satu respons manual"
         description="Form ini mengikuti struktur ManualSurveyInput yang dijelaskan pada dokumentasi backend."
       >
+        <div class="mb-5 rounded-2xl border border-cyan-300/20 bg-cyan-300/5 p-4">
+          <label class="mb-2 block text-sm font-semibold text-cyan-100" for="manual-project-select">
+            Project untuk data survey
+          </label>
+          <select
+            id="manual-project-select"
+            :value="activeProjectId ?? ''"
+            class="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white"
+            @change="
+              (event) => {
+                const project = projects.find(
+                  (item) => String(item.id) === (event.target as HTMLSelectElement).value,
+                )
+                if (project) void selectProject(project)
+              }
+            "
+          >
+            <option value="" disabled>Pilih project yang sudah dibuat</option>
+            <option v-for="project in projects" :key="String(project.id)" :value="String(project.id)">
+              {{ project.name || project.project_name || 'Tanpa nama' }}
+            </option>
+          </select>
+          <p class="mt-2 text-xs text-slate-400">
+            Data respons akan disimpan ke project yang dipilih. UUID dikelola otomatis oleh frontend.
+          </p>
+        </div>
         <form class="grid gap-4 md:grid-cols-2" @submit.prevent="submitForm">
           <label class="md:col-span-2">
             <span class="mb-2 block text-sm text-slate-300">Nama</span>
